@@ -5,16 +5,17 @@
 
 //  TODO: create the main Loop().
 
-
+//  The next line is there to prevent large in-rush currents.
+#define SOFTPWM_OUTPUT_DELAY
 #include <SoftPWM.h>
 
 // SOFTPWM_DEFINE_CHANNEL( 0, DDRD, PORTD, PORTD0);  //Arduino pin  0
 // SOFTPWM_DEFINE_CHANNEL( 1, DDRD, PORTD, PORTD1);  //Arduino pin  1
 // SOFTPWM_DEFINE_CHANNEL( 2, DDRD, PORTD, PORTD2);  //Arduino pin  2
-// SOFTPWM_DEFINE_CHANNEL( 3, DDRD, PORTD, PORTD3);  //Arduino pin  3
-// SOFTPWM_DEFINE_CHANNEL( 4, DDRD, PORTD, PORTD4);  //Arduino pin  4
-// SOFTPWM_DEFINE_CHANNEL( 5, DDRD, PORTD, PORTD5);  //Arduino pin  5
-// SOFTPWM_DEFINE_CHANNEL( 6, DDRD, PORTD, PORTD6);  //Arduino pin  6
+SOFTPWM_DEFINE_CHANNEL( 3, DDRD, PORTD, PORTD3);  //Arduino pin  3
+SOFTPWM_DEFINE_CHANNEL( 4, DDRD, PORTD, PORTD4);  //Arduino pin  4
+SOFTPWM_DEFINE_CHANNEL( 5, DDRD, PORTD, PORTD5);  //Arduino pin  5
+SOFTPWM_DEFINE_CHANNEL( 6, DDRD, PORTD, PORTD6);  //Arduino pin  6
 // SOFTPWM_DEFINE_CHANNEL( 7, DDRD, PORTD, PORTD7);  //Arduino pin  7
 // SOFTPWM_DEFINE_CHANNEL( 8, DDRB, PORTB, PORTB0);  //Arduino pin  8
 // SOFTPWM_DEFINE_CHANNEL( 9, DDRB, PORTB, PORTB1);  //Arduino pin  9
@@ -22,12 +23,14 @@
 // SOFTPWM_DEFINE_CHANNEL(11, DDRB, PORTB, PORTB3);  //Arduino pin 11
 // SOFTPWM_DEFINE_CHANNEL(12, DDRB, PORTB, PORTB4);  //Arduino pin 12
 // SOFTPWM_DEFINE_CHANNEL(13, DDRB, PORTB, PORTB5);  //Arduino pin 13
-// SOFTPWM_DEFINE_CHANNEL(14, DDRC, PORTC, PORTC0);  //Arduino pin A0
-// SOFTPWM_DEFINE_CHANNEL(15, DDRC, PORTC, PORTC1);  //Arduino pin A1
-// SOFTPWM_DEFINE_CHANNEL(16, DDRC, PORTC, PORTC2);  //Arduino pin A2
-// SOFTPWM_DEFINE_CHANNEL(17, DDRC, PORTC, PORTC3);  //Arduino pin A3
-// SOFTPWM_DEFINE_CHANNEL(18, DDRC, PORTC, PORTC4);  //Arduino pin A4
-// SOFTPWM_DEFINE_CHANNEL(19, DDRC, PORTC, PORTC5);  //Arduino pin A5
+SOFTPWM_DEFINE_CHANNEL(14, DDRC, PORTC, PORTC0);  //Arduino pin A0
+SOFTPWM_DEFINE_CHANNEL(15, DDRC, PORTC, PORTC1);  //Arduino pin A1
+SOFTPWM_DEFINE_CHANNEL(16, DDRC, PORTC, PORTC2);  //Arduino pin A2
+SOFTPWM_DEFINE_CHANNEL(17, DDRC, PORTC, PORTC3);  //Arduino pin A3
+SOFTPWM_DEFINE_CHANNEL(18, DDRC, PORTC, PORTC4);  //Arduino pin A4
+SOFTPWM_DEFINE_CHANNEL(19, DDRC, PORTC, PORTC5);  //Arduino pin A5
+
+SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS( 10,100);
 
 
 #include <NmraDcc.h>
@@ -50,9 +53,9 @@
 
 
 int tim_delay = 500;
-int numfpins  =  12;
-byte fpins [] = { 14,  15,  16,  17,  18,  19,   5,   6,   9,  10,  13, 4};
-//  pinnames:  > PC0, PC1, PC2, PC3, PC4, PC5, PD5, PD6, PB1, PB2, PB5 <
+int numfpins  =  13;
+byte fpins [] = { 14,  15,  16,  17,  18,  19,   3,   4,   5,   6,   9,  10,  13};
+//  pinnames:  > PC0, PC1, PC2, PC3, PC4, PC5, PD3, PD4, PD5, PD6, PB1, PB2, PB5 <
 
 const int FunctionPinRx  =  0;  // PD0
 const int FunctionPinTx  =  1;  // PD1
@@ -114,31 +117,31 @@ CVPair FactoryDefaultCVs [] =
    {CV_To_Store_SET_CV_Address,      SET_CV_Address       & 0xFF },  // LSB Set CV Address
    {CV_To_Store_SET_CV_Address + 1, (SET_CV_Address >> 8) & 0x3F },  // MSB Set CV Address
 
-   { 30,   4}, // GEN Number of outputs  (16 maximum)
+   { 30,   4}, // GEN 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 31,  50}, //     Maximum level outputs (100 max)
    { 32, 100}, //     Waitmicros  (250 * 100,000 max)
    { 33,   4}, //     Waitmicros divider (standard 4)
-   { 34, 999}, //     Standard blink interval  (1000)
+   { 34, 100}, //     Standard blink interval  (1000)
    { 35,   1}, // LS1 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 36, 100}, //     Maximum level this output
    { 37, 100}, //     Waitmicros output highend
    { 38,   4}, //     Waitmicros output divider
-   { 39, 750}, //     Blinkinterval this output
+   { 39,  75}, //     Blinkinterval this output
    { 40,   3}, // LS2 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 41, 100}, //     Maximum level this output
    { 42, 100}, //     Waitmicros output highend
    { 43,   4}, //     Waitmicros output divider
-   { 44, 750}, //     Blinkinterval this output
+   { 44,  75}, //     Blinkinterval this output
    { 45,   1}, // LS3 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 46, 100}, //     Maximum level this output
    { 47, 100}, //     Waitmicros output highend
    { 48,   4}, //     Waitmicros output divider
-   { 49, 750}, //     Blinkinterval this output
+   { 49,  75}, //     Blinkinterval this output
    { 50,   5}, // LS4 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 51, 100}, //     Maximum level this output
    { 52, 100}, //     Waitmicros output highend
    { 53,   4}, //     Waitmicros output divider
-   { 54, 750}, //     Blinkinterval this output
+   { 54,  75}, //     Blinkinterval this output
    { 55,   0}, // LS5 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 56,   0}, //     Maximum level this output
    { 57,   0}, //     Waitmicros output highend
@@ -231,6 +234,8 @@ void setup()
    interrupts();
 
 
+   // begin with 50hz pwm frequency
+   Palatis::SoftPWM.begin( 50);
 
    #if defined(_DEBUG_) || defined(_TEST_)
 
@@ -245,8 +250,12 @@ void setup()
       {
          Serial.read(); // Clear the input buffer to get 'real' inputdata.
       }
+
       _PL("-------------------------------------");
       _PL(""); // An extra empty line for clearness
+
+      // print interrupt load for diagnostic purposes
+      Palatis::SoftPWM.printInterruptLoad();
 
    #endif
 
@@ -257,124 +266,196 @@ void setup()
       pinMode(fpins[i], OUTPUT);  // Then make it an output.
    }
 
-
    // Switch on the LED to signal we're ready.
    digitalWrite(FunctionPinLed, 0);
    delay (tim_delay);
    digitalWrite(FunctionPinLed, 1);
 
-   _PL(""); // An extra empty line for clearness
-   _PL("*************************************");
+   #if defined(_DEBUG_) || defined(_TEST_)
 
-   analogWrite(FunctionPin6, 127);  // Start PWM
-   analogWrite(FunctionPin0, 227);  // Start PWM
+      _PL(""); // An extra empty line for clearness
+      _PL("*************************************");
+      _PL(""); // An extra empty line for clearness
+
+   #endif
 
 }
 
 /* ******************************************************************************* */
 
+
+unsigned long previousMillis3 = 0;    // will store last time LED was updated
+unsigned long previousMillis4 = 0;    // will store last time LED was updated
+unsigned long previousMillis5 = 0;    // will store last time LED was updated
+unsigned long previousMillis6 = 0;    // will store last time LED was updated
+
+const long interval3 = 1000;          // interval at which to blink (milliseconds)
+const long interval4 =  250;          // interval at which to blink (milliseconds)
+const long interval5 = 1500;          // interval at which to blink (milliseconds)
+const long interval6 =  500;          // interval at which to blink (milliseconds)
+
+int ledState3 =  LOW;                 // ledState used to set the LED
+int ledState4 =  LOW;                 // ledState used to set the LED
+int ledState5 =  LOW;                 // ledState used to set the LED
+int ledState6 =  LOW;                 // ledState used to set the LED
+
+volatile int maxState3 =   30;   // maximum level
+volatile int maxState5 =   30;   // maximum level
+volatile int counting3 =    0;   // which level we are
+volatile int counting5 =    0;   // which level we are
+volatile bool updown3 = false;   // true = counting up, false = down
+volatile bool updown5 = false;   // true = counting up, false = down
+
+unsigned long waitMicros3 = 10000000 / Palatis::SoftPWM.PWMlevels() /  4;
+unsigned long waitMicros5 = 10000000 / Palatis::SoftPWM.PWMlevels() / 11;
+volatile unsigned long previousMicros3 = 0;
+volatile unsigned long previousMicros5 = 0;
+
+
+/* ******************************************************************************* */
 
 void loop()
 {
 
+/* temp
 //   // set the brightness of FunctionPinX:
 //   analogWrite(FunctionPin6, brightness);
 //   analogWrite(FunctionPin7, brightness);
 
-   // change the brightness for next time through the loop:
-   brightness = brightness + fadeAmount;
+   // // change the brightness for next time through the loop:
+   // brightness = brightness + fadeAmount;
 
-   // reverse the direction of the fading at the ends of the fade:
-   if (brightness <= 0 || brightness >= 255) {
-     fadeAmount = -fadeAmount;
-   }
+   // // reverse the direction of the fading at the ends of the fade:
+   // if (brightness <= 0 || brightness >= 255) {
+   //   fadeAmount = -fadeAmount;
+   // }
 
-   // wait for some milliseconds to see the dimming effect.
-   delay(100);
+   // // wait for some milliseconds to see the dimming effect.
+   // delay(100);
 
-   if (counting)
-   {
-      if (millis () - startTime < INTERVAL)
-         return;
+   // if (counting)
+   // {
+   //    if (millis () - startTime < INTERVAL)
+   //       return;
 
-      counting = false;
-      showResults ();
-   }  // end of if
+   //    counting = false;
+   //    showResults ();
+   // }  // end of if
 
-   noInterrupts ();
-   events = 0;
-   startTime = millis ();
-//   PCIFR  |= 0b00000001;    // clear outstanding interrupts
-//   EIFR = bit (INTF0);  // clear flag for interrupt 0
-   counting = true;
-   interrupts ();
+   // noInterrupts ();
+   // events = 0;
+   // startTime = millis ();
+   // counting = true;
+   // interrupts ();
+*/
+
+
+
+  unsigned long currentMillis = millis();
+  unsigned long currentMicros = micros();
+
+  if (currentMicros - previousMicros3 > waitMicros3)
+  {
+    previousMicros3 = currentMicros;
+
+
+  if ((counting3 > maxState3 - 1) || (counting3 < 1)) updown3 = !updown3;
+  if (updown3 == true) { counting3++; } else { counting3--; }
+
+    Palatis::SoftPWM.set(3, counting3);
+
+  }
+
+  if (currentMicros - previousMicros5 > waitMicros5)
+  {
+    previousMicros5 = currentMicros;
+
+
+  if ((counting5 > maxState5 - 1) || (counting5 < 1)) updown5 = !updown5;
+  if (updown5 == true) { counting5++; } else { counting5--; }
+
+    Palatis::SoftPWM.set(5, counting5);
+
+  }
+
+
+//  if (currentMillis - previousMillis3 >= interval3)
+//  {
+//    // save the last time you blinked the LED
+//    previousMillis3 = currentMillis;
+//
+//    // if the LED is off turn it on and vice-versa:
+//    if (ledState3 == LOW)
+//    {
+//      Palatis::SoftPWM.set( 3,   1);
+//      ledState3 = HIGH;
+//    }
+//    else
+//    {
+//      ledState3 =  LOW;
+//      Palatis::SoftPWM.set( 3,   0);
+//    }
+//  }
+
+  if (currentMillis - previousMillis4 >= interval4)
+  {
+    // save the last time you blinked the LED
+    previousMillis4 = currentMillis;
+
+    // if the LED is off turn it on and vice-versa:
+    if (ledState4 == LOW)
+    {
+      Palatis::SoftPWM.set( 4,  35);
+      ledState4 = HIGH;
+    }
+    else
+    {
+      ledState4 =  LOW;
+      Palatis::SoftPWM.set( 4,   0);
+    }
+  }
+
+//  if (currentMillis - previousMillis5 >= interval5)
+//  {
+//    // save the last time you blinked the LED
+//    previousMillis5 = currentMillis;
+//
+//    // if the LED is off turn it on and vice-versa:
+//    if (ledState5 == LOW)
+//    {
+//      Palatis::SoftPWM.set( 5,   8);
+//      ledState5 = HIGH;
+//    }
+//    else
+//    {
+//      ledState5 =  LOW;
+//      Palatis::SoftPWM.set( 5,   0);
+//    }
+//  }
+
+  if (currentMillis - previousMillis6 > interval6)
+  {
+    // save the last time you blinked the LED
+    previousMillis6 = currentMillis;
+
+    // if the LED is off turn it on and vice-versa:
+    if (ledState6 == LOW)
+    {
+      Palatis::SoftPWM.set( 6,  20);
+      ledState6 = HIGH;
+    }
+    else
+    {
+      ledState6 =  LOW;
+      Palatis::SoftPWM.set( 6,   0);
+    }
+  }
+
+
 
 }
 
 /* ******************************************************************************* */
 
 
-ISR(PCINT0_vect)
-{
-
-   if (counting) events++;
-
-//   if (PINB & B00000010)
-//   {
-//      vol = digitalRead(FunctionPin6);
-//      digitalWrite(FunctionPin0, vol);
-//      digitalWrite(FunctionPin1, vol);
-//   }
-
-//   if (PINB & B00000100)
-//   {
-//      vul = digitalRead(FunctionPin7);
-//      digitalWrite(FunctionPin2, vul);
-//      digitalWrite(FunctionPin3, vul);
-//   }
-
-}
-
-ISR(PCINT1_vect)
-{
-
-   if (counting) events++;
-
-//   if (PINB & B00000010)
-//   {
-//      vol = digitalRead(FunctionPin6);
-//      digitalWrite(FunctionPin0, vol);
-//      digitalWrite(FunctionPin1, vol);
-//   }
-
-//   if (PINB & B00000100)
-//   {
-//      vul = digitalRead(FunctionPin7);
-//      digitalWrite(FunctionPin2, vul);
-//      digitalWrite(FunctionPin3, vul);
-//   }
-
-}
-
-ISR(PCINT2_vect)
-{
-
-   if (counting) events++;
-
-//   if (PINB & B00000010)
-//   {
-//      vol = digitalRead(FunctionPin6);
-//      digitalWrite(FunctionPin0, vol);
-//      digitalWrite(FunctionPin1, vol);
-//   }
-
-//   if (PINB & B00000100)
-//   {
-//      vul = digitalRead(FunctionPin7);
-//      digitalWrite(FunctionPin2, vul);
-//      digitalWrite(FunctionPin3, vul);
-//   }
-
-}
-
-//
+//   
