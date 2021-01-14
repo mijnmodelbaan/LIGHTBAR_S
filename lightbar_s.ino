@@ -803,9 +803,11 @@ void serialEvent() {
 /* ******************************************************************************* */
 
 
-void parseCom(char *com)
+void parseCom( char *com )
 {
-   switch (com[1])  // com[0] = '<' or ' '
+   // uint8_t cvValue, cvCheck;
+
+   switch ( com[1] )  // com[0] = '<' or ' '
    {
 
 
@@ -815,56 +817,67 @@ void parseCom(char *com)
 /*
  *    returns: <0>
  */
-
+      {
          Palatis::SoftPWM.allOff();  // Set the PWM value of all channels to 0.
 
          Serial.println("0");
          break;
+      }
 
 
       case '1':     // <1>   all outputs: On
 /*
  *    returns: <1>
  */
-         //  Serial.print(EEStore::eeStore->data.nOutputs);
+      {
+            //  Serial.print(EEStore::eeStore->data.nOutputs);
          Serial.println("1");
          break;
+      }
 
 
       case '2':     // <2>   all outputs: Blink Off
 /*
  *    returns: <2>
  */
+      {
          //  Serial.print(EEStore::eeStore->data.nOutputs);
          Serial.println("2");
          break;
+      }
 
 
       case '3':     // <3>   all outputs: Blink On
 /*
  *    returns: <3>
  */
+      {
          //  Serial.print(EEStore::eeStore->data.nOutputs);
          Serial.println("3");
          break;
+      }
 
 
       case '4':     // <4>   all outputs: Fade Off
 /*
  *    returns: <4>
  */
+      {
          //  Serial.print(EEStore::eeStore->data.nOutputs);
          Serial.println("4");
          break;
+      }
 
 
       case '5':     // <5>   all outputs: Fade On
 /*
  *    returns: <5>
  */
+      {
          //  Serial.print(EEStore::eeStore->data.nOutputs);
          Serial.println("5");
          break;
+      }
 
 
 /***** OPERATE STATIONARY ACCESSORY DECODERS  ****/    
@@ -879,8 +892,7 @@ void parseCom(char *com)
  *
  *    returns: NONE
  */
-
-         {
+      {
             // uint16_t Addr = Dcc.getAddr();   // 40
 
 // Config 0 = On/Off, 1 = Blink, 2 = Servo, 3 = DBL LED Blink, 4 = Pulsed, 5 = Fade
@@ -901,11 +913,10 @@ void parseCom(char *com)
             // pin = fpins[ 3 ]; // Config 5 = Fade
             // exec_function( 3, pin, 1);
 
-         }
-
 
          // Output::parse(com + 2);
          break;
+      }
 
 
 /***** CREATE/EDIT/REMOVE/SHOW & OPERATE A TURN-OUT  ****/    
@@ -922,8 +933,10 @@ void parseCom(char *com)
  *    *** SEE ACCESSORIES.CPP FOR COMPLETE INFO ON THE DIFFERENT VARIATIONS OF THE "T" COMMAND
  *    USED TO CREATE/EDIT/REMOVE/SHOW TURNOUT DEFINITIONS
  */
+      {
          // Turnout::parse(com + 2);
          break;
+      }
 
 
 /***** CREATE/EDIT/REMOVE/SHOW & OPERATE AN OUTPUT PIN  ****/    //////////////////////////////////////////////////////////////////////////
@@ -940,8 +953,10 @@ void parseCom(char *com)
  *   *** SEE OUTPUTS.CPP FOR COMPLETE INFO ON THE DIFFERENT VARIATIONS OF THE "O" COMMAND
  *   USED TO CREATE/EDIT/REMOVE/SHOW TURNOUT DEFINITIONS
  */
+      {
          // Output::parse(com + 2);
          break;      ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+      }
 
 
 /***** WRITE CONFIGURATION VARIABLE BYTE TO DECODER ****/
@@ -956,48 +971,12 @@ void parseCom(char *com)
  *    returns: <w CV Value)
  *    where VALUE is a number from 0-255 as read from the requested CV, or -1 if verificaiton read fails
  */
-      // pRegs->writeCVByte(com + 2);
-
-// void RegisterList::writeCVByte(char *s) volatile{
-         // byte bWrite[ 4 ];
+      {
          int  bValue, cv;
-         // int  cv, c, d, base;
 
-         if( sscanf( com + 2, "%d %d", &cv, &bValue ) != 2 ) return;
-         // cv--;                              // actual CV addresses are cv-1 (0-1023)
-
-         // bWrite[ 0 ] = 0x7C + (highByte( cv ) & 0x03 );   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
-         // bWrite[ 1 ] = lowByte( cv );
-         // bWrite[ 2 ] = bValue;
+         if( sscanf( com + 2, "%d %d", &cv, &bValue ) != 2 ) { return; }
 
          uint8_t cvCheck = Dcc.setCV( cv, bValue );
-
-//   loadPacket(0,resetPacket,2,1);    // 1 reset packet
-//   loadPacket(0,bWrite,3,4);         // 4 verify packets
-//   loadPacket(0,resetPacket,2,1);    // 1 reset packet
-//   loadPacket(0,idlePacket,2,10);    // 10 idle packets ???
-
-// c=0;
-// d=0;
-// base=0;
-
-//   for(int j=0;j<ACK_BASE_COUNT;j++)
-//     base+=analogRead(CURRENT_MONITOR_PIN_PROG);
-//   base/=ACK_BASE_COUNT;
-
-      //   bWrite[ 0 ] = 0x74 + ( highByte( cv ) & 0x03 );   // set-up to re-verify entire byte
-
-//   loadPacket(0,resetPacket,2,3);          // NMRA recommends starting with 3 reset packets
-//   loadPacket(0,bWrite,3,5);               // NMRA recommends 5 verfy packets
-//   loadPacket(0,resetPacket,2,1);          // forces code to wait until all repeats of bRead are completed (and decoder begins to respond)
-
-//   for(int j=0;j<ACK_SAMPLE_COUNT;j++){
-//     c=(analogRead(CURRENT_MONITOR_PIN_PROG)-base)*ACK_SAMPLE_SMOOTHING+c*(1.0-ACK_SAMPLE_SMOOTHING);
-//     if(c>ACK_SAMPLE_THRESHOLD)
-//       d=1;
-//   }
-
-         // if( d == 0 ) bValue = -1;    // verify unsuccessfull
 
          Serial.print( "<w " );
          Serial.print( cv + 0 , DEC );
@@ -1006,6 +985,7 @@ void parseCom(char *com)
          Serial.print( "> \n");
 
          break;
+      }
 
 
 /***** READ CONFIGURATION VARIABLE BYTE FROM DECODER ****/
@@ -1019,20 +999,17 @@ void parseCom(char *com)
  *    returns: <r CV VALUE)
  *    where VALUE is a number from 0-255 as read from the requested CV, or -1 if read could not be verified
  */
+      {
 
+            // for (int i = 0; i < 20; i++) 
+            // {
+            //    uint8_t cv_value = Dcc.getCV(30 + i);
 
-         {
-            for (int i = 0; i < 20; i++) 
-            {
-               uint8_t cv_value = Dcc.getCV(30 + i);
-
-               Serial.print(" cv_value: ");
-               Serial.println(cv_value, DEC);
-            }
-         }
-
-         // pRegs->readCV(com + 2);
+            //    Serial.print(" cv_value: ");
+            //    Serial.println(cv_value, DEC);
+            // }
          break;
+      }
 
 
 /***** DUMPS CONFIGURATION VARIABLES FROM DECODER ****/
@@ -1044,20 +1021,19 @@ void parseCom(char *com)
  *    returns a list of: <CV VALUE)
  *    where VALUE is a number from 0-255 as read from the CV, or -1 if read could not be verified
  */
-
+      {
+         for (int i = 0; i < FactoryDefaultCVIndex; i++)
          {
-            for (int i = 0; i < FactoryDefaultCVIndex; i++)
-            {
-               uint8_t cvValue = Dcc.getCV( i );
+            uint8_t cvValue = Dcc.getCV( i );
 
-               Serial.print( " cv: "          );
-               Serial.print( i, DEC           );
-               Serial.print( "\t"  " value: " );
-               Serial.print( cvValue, DEC     );
-               Serial.println();
-            }
+            Serial.print( " cv: "          );
+            Serial.print( i, DEC           );
+            Serial.print( "\t"  " value: " );
+            Serial.print( cvValue, DEC     );
+            Serial.println();
          }
          break;
+      }
 
 
 /***** STORE SETTINGS IN EEPROM  ****/
@@ -1068,6 +1044,7 @@ void parseCom(char *com)
  *
  *    returns: <e nTurnouts nSensors>
  */
+      {
          //  EEStore::store();
          //  Serial.print("<e ");
          //  Serial.print(EEStore::eeStore->data.nTurnouts);
@@ -1077,6 +1054,7 @@ void parseCom(char *com)
          //  Serial.print(EEStore::eeStore->data.nOutputs);
          //  Serial.print(">");
          break;
+      }
 
 
 /***** CLEAR SETTINGS IN EEPROM  ****/
@@ -1087,9 +1065,11 @@ void parseCom(char *com)
  *
  *    returns: <O>
  */
+      {
       //  EEStore::clear();
          Serial.print("<O>");
          break;
+      }
 
 
 /***** ATTEMPTS TO DETERMINE HOW MUCH FREE SRAM IS AVAILABLE IN ARDUINO  ****/
@@ -1108,8 +1088,8 @@ void parseCom(char *com)
          Serial.print("<m ");
          Serial.print((int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval));
          Serial.println(">");
+         break;
       }
-      break;
 
 
 /***** PRINT CARRIAGE RETURN IN SERIAL MONITOR WINDOW  ****/
@@ -1120,7 +1100,13 @@ void parseCom(char *com)
  *
  *    returns: a carriage return
  */
+      {
          Serial.println("");
+         break;
+      }
+
+
+      default:
          break;
 
    }
