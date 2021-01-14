@@ -38,7 +38,7 @@ boolean foundEom      = false;   // Founf  end  of messages.
 ///////////////////////////////////////*********************************************************
 
 // Uncomment to use the PinChangeInterrupts iso External Interrupts
-// #define PIN_CHANGE_INT TRUE
+#define PIN_CHANGE_INT
 
 ///////////////////////////////////////*********************************************************
 #include <NmraDcc.h>
@@ -47,7 +47,7 @@ NmraDcc     Dcc ;
 DCC_MSG  Packet ;
 
 // ******** UNLESS YOU WANT ALL CV'S RESET UPON EVERY POWER UP REMOVE THE "//" IN THE FOLLOWING LINE!!
-// #define DECODER_LOADED
+#define DECODER_LOADED
 
 // ******** REMOVE THE "//" IN THE FOLLOWING LINE TO SEND DEBUGGING INFO TO THE SERIAL MONITOR
 #define _DEBUG_
@@ -59,6 +59,9 @@ DCC_MSG  Packet ;
    #define _PP(a)
    #define _PL(a)
 #endif
+
+// ******** REMOVE THE "//" IN THE NEXT LINE IF YOU WANT TO USE YOUR SERIAL PORT FOR COMMANDS
+#define _MONITOR_
 
 
 /* ******************************************************************************* */
@@ -113,15 +116,15 @@ uint8_t CV_DECODER_MASTER_RESET  = 120; // THIS IS THE CV ADDRESS OF THE FULL RE
 
 struct QUEUE
 {
-   int                        inUse;
-   unsigned long     previousMicros;
-   unsigned long         waitMicros;
-   int                  fadeCounter;
-   int                     maxState;
-   bool                      upDown;
-   unsigned long     previousMillis;
-   unsigned long      blinkInterval;
-   int                     ledState;
+   int                        inUse;   // output in use or not
+   unsigned long     previousMicros;   // last time for fading
+   unsigned long         waitMicros;   // interval in micros()
+   int                  fadeCounter;   // count of fadinglevel
+   int                     maxLevel;   // maximum output level
+   bool                      upDown;   // travel direction led
+   unsigned long     previousMillis;   // last time we blinked
+   unsigned long      blinkInterval;   // interval in millis()
+   int                     ledState;   // state of this output
 };
 QUEUE volatile *ftn_queue = new QUEUE[16];
 
@@ -239,42 +242,6 @@ CVPair FactoryDefaultCVs [] =
 /* ******************************************************************************* */
 
 
-// needed per output
-// 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On ******
-// maximum level this output ****************************
-// fader - level counter
-// fader - counting up / down
-// fader - previous micros
-// fader - wait micros divider **************************
-// blink - interval millis ******************************
-// blink - previous millis
-// blink - state - on or off
-
-// unsigned long previousMillis3 = 0;    // will store last time LED was updated
-// const long interval3 = 1000;          // interval at which to blink (milliseconds)
-// int ledState3 =  LOW;                 // ledState used to set the LED
-// volatile int maxState3 =   30;        // maximum level
-// volatile int counting3 =    0;        // which level we are
-// volatile bool updown3 = false;        // true = counting up, false = down
-// unsigned long waitMicros3 = 10000000 / Palatis::SoftPWM.PWMlevels() /  4;
-// volatile unsigned long previousMicros3 = 0;
-
-// unsigned long waitMicros3 = 10000000 / Palatis::SoftPWM.PWMlevels() /  4;
-
-   // { 30,   4}, // GEN 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-   // { 31,  50}, //     Maximum level outputs (100 max)
-   // { 32, 100}, //     Waitmicros  (250 * 100,000 max)
-   // { 33,   4}, //     Waitmicros divider (standard 4)
-   // { 34, 100}, //     Standard blink interval  (1000)
-
-   // { 45,   1}, // LS3 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-   // { 46, 100}, //     Maximum level this output
-   // { 47, 100}, //     Waitmicros output highend
-   // { 48,   4}, //     Waitmicros output divider
-   // { 49,  75}, //     Blinkinterval this output
-
-
-
 uint8_t FactoryDefaultCVIndex = sizeof(FactoryDefaultCVs) / sizeof(CVPair);
 
 void notifyCVResetFactoryDefault()
@@ -282,9 +249,8 @@ void notifyCVResetFactoryDefault()
    // Make 'FactoryDefaultCVIndex' non-zero and equal to num CVs to be reset 
    // to flag to the loop() function that a reset to FacDef needs to be done.
    FactoryDefaultCVIndex = sizeof(FactoryDefaultCVs) / sizeof(CVPair);
-};
+}
 
-//     ** NOTE: NO PROGRAMMING ACK IS SET UP TO MAXIMIZE OUTPUT PINS FOR FUNCTIONS **
 
 /* ******************************************************************************* */
 
@@ -304,7 +270,7 @@ void setup()
    // Start SoftPWM with 50hz pwm frequency
    Palatis::SoftPWM.begin( 50);
 
-   #if defined(_DEBUG_) || defined(_TEST_)
+   #if defined(_DEBUG_) || defined(_MONITOR_)
 
       Serial.begin(115200);
 
@@ -336,6 +302,7 @@ void setup()
       if (Dcc.getCV(CV_DECODER_MASTER_RESET) == CV_DECODER_MASTER_RESET) 
       {
    #endif
+
          for (int i = 0; i < FactoryDefaultCVIndex; i++)
          {
 
@@ -347,10 +314,18 @@ void setup()
 
          }
 
+         // These are the absolute maximums allowed
+         uint8_t M_maxLevel = Dcc.getCV( 31 );
+         uint8_t M_highend  = Dcc.getCV( 32 );
+         uint8_t M_divider  = Dcc.getCV( 33 );
+         uint8_t M_interval = Dcc.getCV( 34 );
+
+         // Loop through all the settings for checking and correcting
          for (int i = 0; i < numfpins; i++) 
          {
             uint8_t cv_value = Dcc.getCV(35 + (i * 5));
 
+            // Print some values if requested
             #if defined(_DEBUG_) || defined(_TEST_)
 
                Serial.print(         "cv #: ");
@@ -360,105 +335,56 @@ void setup()
 
             #endif
 
-
+            // These are the default settings for counters and states
             ftn_queue[i].fadeCounter    =     0;
             ftn_queue[i].ledState       =   LOW;
             ftn_queue[i].previousMicros =     0;
             ftn_queue[i].previousMillis =     0;
             ftn_queue[i].upDown         = false;
 
+            // Now we're going to do some calculations for the rest
+            ftn_queue[i].inUse = Dcc.getCV(35 + (i * 5));
 
-ftn_queue[i].blinkInterval = 100 * 10;
-ftn_queue[i].maxState      = 35;
-ftn_queue[i].waitMicros    = 10000000 / Palatis::SoftPWM.PWMlevels() /  4;
+            uint8_t S_maxLevel = Dcc.getCV(36 + (i * 5));
+            uint8_t S_highend  = Dcc.getCV(37 + (i * 5));
+            uint8_t S_divider  = Dcc.getCV(38 + (i * 5));
+            uint8_t S_interval = Dcc.getCV(39 + (i * 5));
 
-
-// const long interval3 = 1000;          // interval at which to blink (milliseconds)
-// volatile int maxState3 =   30;        // maximum level
-// unsigned long waitMicros3 = 10000000 / Palatis::SoftPWM.PWMlevels() /  4;
-
-
-   // { 30,   4}, // GEN 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-   // { 31,  50}, //     Maximum level outputs (100 max)
-   // { 32, 100}, //     Waitmicros  (250 * 100,000 max)
-   // { 33,   4}, //     Waitmicros divider (standard 4)
-   // { 34, 100}, //     Standard blink interval  (1000)
-   // { 35,   1}, // LS1 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-   // { 36, 100}, //     Maximum level this output
-   // { 37, 100}, //     Waitmicros output highend
-   // { 38,   4}, //     Waitmicros output divider
-   // { 39,  75}, //     Blinkinterval this output
-
-
-//    unsigned long     waitMicros;   // { xx, 100}, //     Waitmicros output highend
-//    int                 maxState;   //
-//    unsigned long  blinkInterval;   // { xx,  75}, //     Blinkinterval this output
-
-                  ftn_queue[i].inUse = 5; // cv_value;
-
-
-            switch (cv_value) 
+            if (M_maxLevel > S_maxLevel)
             {
-               // case 0:     // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-               // {
-               //    // ftn_queue[i].inUse = 0;
-               // }
-               //    break;
-
-         //       case 1:     // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-         //       {
-         // //             ftn_queue[i].inuse = 0;
-         // //             ftn_queue[i].current_position = 0;
-         // //             ftn_queue[i].start_value = 0;
-         // //             ftn_queue[i].increment = int (char (Dcc.getCV(31 + (i * 5))));
-         // //             digitalWrite(fpins[i], 0);
-         // //             ftn_queue[i].stop_value = int (Dcc.getCV(33 + (i * 5)));
-         //       }
-         //          break;
-
-               // case 2:     // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-               // { 
-               // }
-               //    break;
-
-         //       case 3:     // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-         //       {
-         // //             ftn_queue[i].inuse = 0;
-         // //             ftn_queue[i].current_position = 0;
-         // //             ftn_queue[i].start_value = 0;
-         // //             ftn_queue[i].increment = Dcc.getCV(31 + (i * 5));
-         // //             digitalWrite(fpins[i], 0);
-         // //             digitalWrite(fpins[i + 1], 0);
-         // //             ftn_queue[i].stop_value = int(Dcc.getCV(33 + (i * 5)));
-         //       }
-         //          break;
-
-         //       case 4:     // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-         //       {
-         // //             ftn_queue[i].inuse = 0;
-         // //             ftn_queue[i].current_position = 0;
-         // //             ftn_queue[i].increment = 10 * int (char (Dcc.getCV(31 + (i * 5))));
-         // //             digitalWrite(fpins[i], 0);
-         //       }
-         //          break;
-
-         //       case 5:     // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-         //       {
-         // //             ftn_queue[i].inuse = 0;
-         // //             ftn_queue[i].start_value = 0;
-         // //             ftn_queue[i].increment = int (char (Dcc.getCV(31 + (i * 5))));
-         // //             digitalWrite(fpins[i], 0);
-         // //             ftn_queue[i].stop_value = int(Dcc.getCV(33 + (i * 5))) * 10.;
-         //       }
-         //          break;
-
-               // default:     // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-               // // {
-               // //    ftn_queue[i].inUse = 1;
-               // // }
-               //    break;
+               ftn_queue[i].maxLevel = S_maxLevel;
+            }
+            else
+            {
+               ftn_queue[i].maxLevel = M_maxLevel;
             }
 
+            if (M_interval > S_interval)
+            {
+               ftn_queue[i].blinkInterval = S_interval * 10;
+            }
+            else
+            {
+               ftn_queue[i].blinkInterval = M_interval * 10;
+            }
+
+            if (M_highend > S_highend)
+            {
+               ftn_queue[i].waitMicros = ( (S_highend * 100000) / Palatis::SoftPWM.PWMlevels() );
+            }
+            else
+            {
+               ftn_queue[i].waitMicros = ( (M_highend * 100000) / Palatis::SoftPWM.PWMlevels() );
+            }
+
+            if (M_divider > S_divider)
+            {
+               ftn_queue[i].waitMicros = ( ftn_queue[i].waitMicros / S_divider );
+            }
+            else
+            {
+               ftn_queue[i].waitMicros = ( ftn_queue[i].waitMicros / M_divider );
+            }
          }
    #if defined(DECODER_LOADED)
       }
@@ -468,11 +394,12 @@ ftn_queue[i].waitMicros    = 10000000 / Palatis::SoftPWM.PWMlevels() /  4;
       Serial.println(""); // An extra empty line for clearness
       Serial.println("*************************************");
 
-      displayText();   // Shows the standard explanation text.
+      #ifdef _MONITOR_
+         displayText(); // Shows the standard explanation text
+      #endif
 
       Serial.println("*************************************");
       Serial.println(""); // An extra empty line for clearness
-
    #endif
 
    // Switch on the LED to signal we're ready.
@@ -484,41 +411,9 @@ ftn_queue[i].waitMicros    = 10000000 / Palatis::SoftPWM.PWMlevels() /  4;
    delay (tim_delay);
    digitalWrite(FunctionPinLed, 1);
 
-   interrupts();
+   interrupts();  // Ready to rumble....
 
 }
-
-
-/* ******************************************************************************* */
-
-
-// unsigned long previousMillis3 = 0;    // will store last time LED was updated
-// unsigned long previousMillis4 = 0;    // will store last time LED was updated
-// unsigned long previousMillis5 = 0;    // will store last time LED was updated
-// unsigned long previousMillis6 = 0;    // will store last time LED was updated
-
-// const long interval3 = 1000;          // interval at which to blink (milliseconds)
-// const long interval4 =  250;          // interval at which to blink (milliseconds)
-// const long interval5 = 1500;          // interval at which to blink (milliseconds)
-// const long interval6 =  500;          // interval at which to blink (milliseconds)
-
-// int ledState3 =  LOW;                 // ledState used to set the LED
-// int ledState4 =  LOW;                 // ledState used to set the LED
-// int ledState5 =  LOW;                 // ledState used to set the LED
-// int ledState6 =  LOW;                 // ledState used to set the LED
-
-// volatile int maxState3 =   30;        // maximum level
-// volatile int maxState5 =   30;        // maximum level
-// volatile int counting3 =    0;        // which level we are
-// volatile int counting5 =    0;        // which level we are
-// volatile bool updown3 = false;        // true = counting up, false = down
-// volatile bool updown5 = false;        // true = counting up, false = down
-
-// unsigned long waitMicros3 = 10000000 / Palatis::SoftPWM.PWMlevels() /  4;
-// unsigned long waitMicros5 = 10000000 / Palatis::SoftPWM.PWMlevels() / 11;
-
-// volatile unsigned long previousMicros3 = 0;
-// volatile unsigned long previousMicros5 = 0;
 
 
 /* ******************************************************************************* */
@@ -539,15 +434,9 @@ void loop()
 
          switch (Dcc.getCV(35 + (i * 5)))
          {
-            case 0:     // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-            {
-               Palatis::SoftPWM.set( i,   0);
-            }
-               break;
-
             case 1:     // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
             {
-               Palatis::SoftPWM.set( i, ftn_queue[i].maxState);
+               Palatis::SoftPWM.set( i, ftn_queue[i].maxLevel);
             }
                break;
 
@@ -561,7 +450,7 @@ void loop()
                   // If the LED is off turn it on and vice-versa
                   if (ftn_queue[i].ledState == LOW)
                   {
-                     Palatis::SoftPWM.set( i, ftn_queue[i].maxState);
+                     Palatis::SoftPWM.set( i, ftn_queue[i].maxLevel);
                      ftn_queue[i].ledState =  HIGH;
                   }
                   else
@@ -579,7 +468,7 @@ void loop()
                {
                   ftn_queue[i].previousMicros = currentMicros;
 
-                  if ((ftn_queue[i].fadeCounter > ftn_queue[i].maxState - 1) || (ftn_queue[i].fadeCounter < 1))
+                  if ((ftn_queue[i].fadeCounter > ftn_queue[i].maxLevel - 1) || (ftn_queue[i].fadeCounter < 1))
                   {
                      ftn_queue[i].upDown = !ftn_queue[i].upDown;
                   }
@@ -602,12 +491,16 @@ void loop()
       }
    }
 
-   if (foundEom)
-   {
-      foundBom = false;
-      foundEom = false;
-      parseCom(commandString);
-   }
+   #ifdef _MONITOR_
+
+      if (foundEom)
+      {
+         foundBom = false;
+         foundEom = false;
+         parseCom(commandString);
+      }
+
+   #endif
 
    if( FactoryDefaultCVIndex && Dcc.isSetCVReady())
    {
@@ -620,8 +513,212 @@ void loop()
 }
 
 
+/* **********************************************************************************
+ *    notifyDccFunc() Callback for a multifunction decoder function command.
+ *
+ *  Inputs:
+ *    Addr        - Active decoder address.
+ *    AddrType    - DCC_ADDR_SHORT or DCC_ADDR_LONG.
+ *    FuncGrp     - Function group. FN_0      - 14 speed headlight  Mask FN_BIT_00
+ * 
+ *                                  FN_0_4    - Functions  0 to  4. Mask FN_BIT_00 - FN_BIT_04
+ *                                  FN_5_8    - Functions  5 to  8. Mask FN_BIT_05 - FN_BIT_08
+ *                                  FN_9_12   - Functions  9 to 12. Mask FN_BIT_09 - FN_BIT_12
+ *                                  FN_13_20  - Functions 13 to 20. Mask FN_BIT_13 - FN_BIT_20 
+ *                                  FN_21_28  - Functions 21 to 28. Mask FN_BIT_21 - FN_BIT_28
+ *    FuncState   - Function state. Bitmask where active functions have a 1 at that bit.
+ *                                  You must & FuncState with the appropriate
+ *                                  FN_BIT_nn value to isolate a given bit.
+ *
+ *  Returns:
+ *    None
+ */
+void  notifyDccFunc( uint16_t Addr, DCC_ADDR_TYPE AddrType, FN_GROUP FuncGrp, uint8_t FuncState)
+{
+
+   #if defined(_DEBUG_) || defined(_MONITOR_)
+
+      Serial.print( "notifyDccFunc: Addr: " );
+      Serial.print( Addr,  DEC );
+      Serial.print( (AddrType == DCC_ADDR_SHORT) ? 'S' : 'L' );
+      Serial.print( "\t"  " Function Group: " );
+      Serial.print( FuncGrp,  DEC );
+      Serial.print( "\t"  " State: " );
+      Serial.print( FuncState,  DEC );
+      Serial.println();
+
+   #endif
+
+   switch(FuncGrp)
+   {
+      case FN_0_4:    //Function Group 1 F0 F4 F3 F2 F1
+         exec_function(  0, FunctionPin0 , (FuncState & FN_BIT_00)>>4 );
+         exec_function(  1, FunctionPin1 , (FuncState & FN_BIT_01)    );
+         exec_function(  2, FunctionPin2 , (FuncState & FN_BIT_02)>>1 );
+         exec_function(  3, FunctionPin3 , (FuncState & FN_BIT_03)>>2 );
+         exec_function(  4, FunctionPin4 , (FuncState & FN_BIT_04)>>3 );
+         break;
+
+      case FN_5_8:    //Function Group 1 S FFFF == 1 F8 F7 F6 F5  &  == 0  F12 F11 F10 F9 F8
+         exec_function(  5, FunctionPin5 , (FuncState & FN_BIT_05)    );
+         exec_function(  6, FunctionPin6 , (FuncState & FN_BIT_06)>>1 );
+         exec_function(  7, FunctionPin7 , (FuncState & FN_BIT_07)>>2 );
+         exec_function(  8, FunctionPin8 , (FuncState & FN_BIT_08)>>3 );
+         break;
+
+      case FN_9_12:
+         exec_function(  9, FunctionPin9 , (FuncState & FN_BIT_09)    );
+         exec_function( 10, FunctionPin10, (FuncState & FN_BIT_10)>>1 );
+         exec_function( 11, FunctionPin11, (FuncState & FN_BIT_11)>>2 );
+         exec_function( 12, FunctionPin12, (FuncState & FN_BIT_12)>>3 );
+         break;
+
+      case FN_13_20:   //Function Group 2 FuncState == F20-F13 Function Control
+         exec_function( 13, FunctionPin13, (FuncState & FN_BIT_13)    );
+         exec_function( 14, FunctionPin14, (FuncState & FN_BIT_14)>>1 );
+         exec_function( 15, FunctionPin15, (FuncState & FN_BIT_15)>>2 );
+         //ec_function( 16, FunctionPin16, (FuncState & FN_BIT_16)>>3 );
+         break;
+
+      case FN_21_28:
+         break;	
+   }
+}
+
+void exec_function (int function, int pin, int FuncState)
+{
+
+  switch ( Dcc.getCV( 35 + ( function * 5 ) ) )
+  {
+
+   // case 0:    // On - Off LED
+   //    digitalWrite (pin, FuncState);
+   //    ftn_queue[function].inuse = 0;
+   //    break;
+
+   //  case 1:    // Blinking LED
+   //    if ((ftn_queue[function].inuse==0) && (FuncState==1))  {
+   //      ftn_queue[function].inuse = 1;
+   //      ftn_queue[function].start_value = 0;
+   //      digitalWrite(pin, 0);
+   //      ftn_queue[function].stop_value = int(Dcc.getCV( 33+(function*5)));
+   //    } else {
+   //        if ((ftn_queue[function].inuse==1) && (FuncState==0)) {
+   //          ftn_queue[function].inuse = 0;
+   //          digitalWrite(pin, 0);
+   //        }
+   //      }
+   //    break;
+
+   //  case 2:    // Servo
+   //    if (ftn_queue[function].inuse == 0)  {
+	//     ftn_queue[function].inuse = 1;
+	// 	servo[function].attach(pin);
+	//   }
+   //    if (FuncState==1) ftn_queue[function].increment = char ( Dcc.getCV( 31+(function*5)));
+   //      else ftn_queue[function].increment = - char(Dcc.getCV( 31+(function*5)));
+   //    if (FuncState==1) ftn_queue[function].stop_value = Dcc.getCV( 33+(function*5));
+   //      else ftn_queue[function].stop_value = Dcc.getCV( 32+(function*5));
+   //    break;
+
+   //  case 3:    // Blinking LED PAIR
+   //    if ((ftn_queue[function].inuse==0) && (FuncState==1))  {
+   //      ftn_queue[function].inuse = 1;
+   //      ftn_queue[function].start_value = 0;
+   //      digitalWrite(fpins[function], 0);
+   //      digitalWrite(fpins[function+1], 1);
+   //      ftn_queue[function].stop_value = int(Dcc.getCV( 33+(function*5)));
+   //    } else {
+   //        if (FuncState==0) {
+   //          ftn_queue[function].inuse = 0;
+   //          digitalWrite(fpins[function], 0);
+   //          digitalWrite(fpins[function+1], 0);
+   //        }
+   //      }
+   //    break;
+
+   //  case 4:    // Pulse Output based on Rate*10 Milliseconds
+   //    if ((ftn_queue[function].inuse==0) && (FuncState==1)) {  //First Turn On Detected
+   //      digitalWrite(fpins[function], 1);
+	// 	delay (10*ftn_queue[function].increment);
+   //      digitalWrite(fpins[function], 0);
+	// 	ftn_queue[function].inuse = 1;                    //inuse set to 1 says we already pulsed
+   //    } else 
+   //        if (FuncState==0)  ftn_queue[function].inuse = 0;
+   //    break;
+
+   //  case 5:    // Fade On
+   //    #define fadedelay 24
+   //    if ((ftn_queue[function].inuse==0) && (FuncState==1))  {
+   //      ftn_queue[function].inuse = 1;
+   //      for (t=0; t<ftn_queue[function].stop_value; t+=ftn_queue[function].increment) {
+   //        digitalWrite( fpins[function], 1);
+   //        delay(fadedelay*(t/(1.*ftn_queue[function].stop_value)));
+   //        digitalWrite( fpins[function], 0);
+   //        delay(fadedelay-(fadedelay*(t/(1.*ftn_queue[function].stop_value))));
+   //      }
+   //      digitalWrite( fpins[function],  1 );
+   //    } else {
+   //        if ((ftn_queue[function].inuse==1) && (FuncState==0)) {
+   //          ftn_queue[function].inuse = 0;
+   //          digitalWrite(fpins[function], 0);
+   //        }
+   //      }
+   //    break;
+
+  }
+}
+
+
+/*+
+ *  notifyCVChange()  Called when a CV value is changed.
+ *                    This is called whenever a CV's value is changed.
+ *  notifyDccCVChange()  Called only when a CV value is changed by a Dcc packet or a internal lib function.
+ *                    it is NOT called if the CV is changed by means of the setCV() method.
+ *                    Note: It is not called if notifyCVWrite() is defined
+ *                    or if the value in the EEPROM is the same as the value
+ *                    in the write command. 
+ *
+ *  Inputs:
+ *    CV        - CV number.
+ *    Value     - Value of the CV.
+ *
+ *  Returns:
+ *    None
+ */
+void notifyCVChange(uint16_t CV, uint8_t Value)
+{
+   #if defined(_DEBUG_) || defined(_MONITOR_)
+
+      Serial.print( "notifyCVChange: CV: ");
+      Serial.print( CV, DEC);
+      Serial.print( " Value: " );
+      Serial.print( Value, DEC);
+      Serial.println();
+
+   #else
+
+      Value = Value;  // Silence Compiler Warnings...
+      CV = CV;
+
+   #endif  
+
+// eerst checken of CV 30 is >> on/off outputs
+// daarna checken CV 31 t/m 34 >> (her)bereken outputs
+
+// hierna kijken welke groep (0 t/m 14) betrokken is
+// dan kijken we welke groep herberekend moet worden
+
+}
+
+
 /* ******************************************************************************* */
-     // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+// The next part will / can only be used for an mpu with enough memory
+
+#ifdef _MONITOR_
+
+/* ******************************************************************************* */
+      // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
 /* **********************************************************************************
 
    <0>   all outputs: Off
@@ -630,13 +727,19 @@ void loop()
    <3>   all outputs: Blink On
    <4>   all outputs: Fade Off
    <5>   all outputs: Fade On
+
    <R>   reads a configuration variable: <R x>
    <W>   write a configuration variable: <W x y>
 
    <C>   clear everything: Factory Default
    <D>   dumps everything: to Serial.Print
 
-   <f>: controls mobile engine decoder functions F0-F28
+   <f>   controls mobile engine decoder functions F0-F12: <f x y>
+   <F>   lists all funtions and settings for all outputs: <F>
+
+   <M>   list the available SRAM on the chip
+
+
    <a>: controls stationary accessory decoders
    <b>: sets/clear a configuration variable bit in an engine decoder on the main operations track
    <B>: sets/clear a configuration variable bit in an engine decoder on the programming track
@@ -704,6 +807,65 @@ void parseCom(char *com)
 {
    switch (com[1])  // com[0] = '<' or ' '
    {
+
+
+/*****  SWITCH ALL THE OUTPUTS AT ONCE  ****/
+
+      case '0':     // <0>   all outputs: Off
+/*
+ *    returns: <0>
+ */
+
+         Palatis::SoftPWM.allOff();  // Set the PWM value of all channels to 0.
+
+         Serial.println("0");
+         break;
+
+
+      case '1':     // <1>   all outputs: On
+/*
+ *    returns: <1>
+ */
+         //  Serial.print(EEStore::eeStore->data.nOutputs);
+         Serial.println("1");
+         break;
+
+
+      case '2':     // <2>   all outputs: Blink Off
+/*
+ *    returns: <2>
+ */
+         //  Serial.print(EEStore::eeStore->data.nOutputs);
+         Serial.println("2");
+         break;
+
+
+      case '3':     // <3>   all outputs: Blink On
+/*
+ *    returns: <3>
+ */
+         //  Serial.print(EEStore::eeStore->data.nOutputs);
+         Serial.println("3");
+         break;
+
+
+      case '4':     // <4>   all outputs: Fade Off
+/*
+ *    returns: <4>
+ */
+         //  Serial.print(EEStore::eeStore->data.nOutputs);
+         Serial.println("4");
+         break;
+
+
+      case '5':     // <5>   all outputs: Fade On
+/*
+ *    returns: <5>
+ */
+         //  Serial.print(EEStore::eeStore->data.nOutputs);
+         Serial.println("5");
+         break;
+
 
 /***** OPERATE STATIONARY ACCESSORY DECODERS  ****/    
 
@@ -784,33 +946,77 @@ void parseCom(char *com)
 
 /***** WRITE CONFIGURATION VARIABLE BYTE TO DECODER ****/
 
-      case 'W':      // <W CV VALUE CALLBACKNUM CALLBACKSUB>
+      case 'W':      // <W CV VALUE>
 /*
- *    writes, and then verifies, a Configuration Variable to the decoder of an engine on the programming track
+ *    writes, and then verifies, a Configuration Variable to the decoder
  *
  *    CV: the number of the Configuration Variable memory location in the decoder to write to (1-1024)
  *    VALUE: the value to be written to the Configuration Variable memory location (0-255) 
- *    CALLBACKNUM: an arbitrary integer (0-32767) that is ignored by the Base Station and is simply echoed back in the output - useful for external programs that call this function
- *    CALLBACKSUB: a second arbitrary integer (0-32767) that is ignored by the Base Station and is simply echoed back in the output - useful for external programs (e.g. DCC++ Interface) that call this function
  *
- *    returns: <r CALLBACKNUM|CALLBACKSUB|CV Value)
+ *    returns: <w CV Value)
  *    where VALUE is a number from 0-255 as read from the requested CV, or -1 if verificaiton read fails
  */
-         // pRegs->writeCVByte(com + 2);
+      // pRegs->writeCVByte(com + 2);
+
+// void RegisterList::writeCVByte(char *s) volatile{
+         // byte bWrite[ 4 ];
+         int  bValue, cv;
+         // int  cv, c, d, base;
+
+         if( sscanf( com + 2, "%d %d", &cv, &bValue ) != 2 ) return;
+         // cv--;                              // actual CV addresses are cv-1 (0-1023)
+
+         // bWrite[ 0 ] = 0x7C + (highByte( cv ) & 0x03 );   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
+         // bWrite[ 1 ] = lowByte( cv );
+         // bWrite[ 2 ] = bValue;
+
+         uint8_t cvCheck = Dcc.setCV( cv, bValue );
+
+//   loadPacket(0,resetPacket,2,1);    // 1 reset packet
+//   loadPacket(0,bWrite,3,4);         // 4 verify packets
+//   loadPacket(0,resetPacket,2,1);    // 1 reset packet
+//   loadPacket(0,idlePacket,2,10);    // 10 idle packets ???
+
+// c=0;
+// d=0;
+// base=0;
+
+//   for(int j=0;j<ACK_BASE_COUNT;j++)
+//     base+=analogRead(CURRENT_MONITOR_PIN_PROG);
+//   base/=ACK_BASE_COUNT;
+
+      //   bWrite[ 0 ] = 0x74 + ( highByte( cv ) & 0x03 );   // set-up to re-verify entire byte
+
+//   loadPacket(0,resetPacket,2,3);          // NMRA recommends starting with 3 reset packets
+//   loadPacket(0,bWrite,3,5);               // NMRA recommends 5 verfy packets
+//   loadPacket(0,resetPacket,2,1);          // forces code to wait until all repeats of bRead are completed (and decoder begins to respond)
+
+//   for(int j=0;j<ACK_SAMPLE_COUNT;j++){
+//     c=(analogRead(CURRENT_MONITOR_PIN_PROG)-base)*ACK_SAMPLE_SMOOTHING+c*(1.0-ACK_SAMPLE_SMOOTHING);
+//     if(c>ACK_SAMPLE_THRESHOLD)
+//       d=1;
+//   }
+
+         // if( d == 0 ) bValue = -1;    // verify unsuccessfull
+
+         Serial.print( "<w " );
+         Serial.print( cv + 0 , DEC );
+         Serial.print( " "   );
+         Serial.print( cvCheck, DEC );
+         Serial.print( "> \n");
+
          break;
 
 
 /***** READ CONFIGURATION VARIABLE BYTE FROM DECODER ****/
 
-      case 'R':     // <R CV CALLBACKNUM CALLBACKSUB>
+      case 'R':     // <R CV>
 /*
- *    reads a Configuration Variable from the decoder of an engine on the programming track
+ *    reads a Configuration Variable from the decoder
  *
  *    CV: the number of the Configuration Variable memory location in the decoder to read from (1-1024)
- *    CALLBACKNUM: an arbitrary integer (0-32767) that is ignored by the Base Station and is simply echoed back in the output - useful for external programs that call this function
- *    CALLBACKSUB: a second arbitrary integer (0-32767) that is ignored by the Base Station and is simply echoed back in the output - useful for external programs (e.g. DCC++ Interface) that call this function
  *
- *    returns: <r CALLBACKNUM|CALLBACKSUB|CV VALUE)
+ *    returns: <r CV VALUE)
  *    where VALUE is a number from 0-255 as read from the requested CV, or -1 if read could not be verified
  */
 
@@ -829,58 +1035,28 @@ void parseCom(char *com)
          break;
 
 
-/***** READ STATUS OF DCC++ BASE STATION  ****/
+/***** DUMPS CONFIGURATION VARIABLES FROM DECODER ****/
 
-      case 's':      // <s>
+      case 'D':     // <D>
 /*
- *    returns status messages containing track power status, throttle status, turn-out status, and a version number
- *    NOTE: this is very useful as a first command for an interface to send to this sketch in order to verify 
- *          connectivity and update any GUI to reflect actual throttle and turn-out settings
+ *    dumps all Configuration Variables from the decoder
  *
- *    returns: series of status messages that can be read by an interface to determine status of DCC++ Base Station and important settings
- */  //  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-/*      if (digitalRead(SIGNAL_ENABLE_PIN_PROG) == LOW)      // could check either PROG or MAIN
-        Serial.print("<p0>");
-      else
-        Serial.print("<p1>");
+ *    returns a list of: <CV VALUE)
+ *    where VALUE is a number from 0-255 as read from the CV, or -1 if read could not be verified
+ */
 
-      for (int i = 1; i <= MAX_MAIN_REGISTERS; i++)
-      {
-        if (mRegs->speedTable[i] == 0)
-          continue;
-        Serial.print("<T");
-        Serial.print(i); 
-        Serial.print(" ");
-        if(mRegs->speedTable[i] > 0)
-        {
-          Serial.print( mRegs->speedTable[i]);
-          Serial.print(" 1>");
-        } else {
-          Serial.print(-mRegs->speedTable[i]);
-          Serial.print(" 0>");
-        }
-      }
-      Serial.print("<iDCC++ BASE STATION FOR ARDUINO ");
-      Serial.print(ARDUINO_TYPE);
-      Serial.print(" / ");
-      Serial.print(MOTOR_SHIELD_NAME);
-      Serial.print(": V-");
-      Serial.print(VERSION);
-      Serial.print(" / ");
-      Serial.print(__DATE__);
-      Serial.print(" ");
-      Serial.print(__TIME__);
-      Serial.print(">");
+         {
+            for (int i = 0; i < FactoryDefaultCVIndex; i++)
+            {
+               uint8_t cvValue = Dcc.getCV( i );
 
-      Serial.print("<N");
-      Serial.print(COMM_TYPE);
-      Serial.print(": ");
-
-      Serial.print("SERIAL>");
-*/
-      //  Turnout::show();
-      //  Output::show();
-
+               Serial.print( " cv: "          );
+               Serial.print( i, DEC           );
+               Serial.print( "\t"  " value: " );
+               Serial.print( cvValue, DEC     );
+               Serial.println();
+            }
+         }
          break;
 
 
@@ -916,6 +1092,26 @@ void parseCom(char *com)
          break;
 
 
+/***** ATTEMPTS TO DETERMINE HOW MUCH FREE SRAM IS AVAILABLE IN ARDUINO  ****/
+
+      case 'M':     // <M>
+/*
+ *    measure amount of free SRAM memory left on the Arduino based on trick found on the internet.
+ *    Useful when setting dynamic array sizes, considering the Uno only has 2048 bytes of dynamic SRAM.
+ *    Unfortunately not very reliable --- would be great to find a better method
+ *
+ *    returns: <m MEM>
+ *    where MEM is the number of free bytes remaining in the Arduino's SRAM
+ */
+      {
+         int v; 
+         Serial.print("<m ");
+         Serial.print((int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval));
+         Serial.println(">");
+      }
+      break;
+
+
 /***** PRINT CARRIAGE RETURN IN SERIAL MONITOR WINDOW  ****/
 
       case ' ':     // < >
@@ -927,31 +1123,49 @@ void parseCom(char *com)
          Serial.println("");
          break;
 
-
-/***** ATTEMPTS TO DETERMINE HOW MUCH FREE SRAM IS AVAILABLE IN ARDUINO  ****/
-
-      case 'F':     // <F>
-/*
- *    measure amount of free SRAM memory left on the Arduino based on trick found on the internet.
- *    Useful when setting dynamic array sizes, considering the Uno only has 2048 bytes of dynamic SRAM.
- *    Unfortunately not very reliable --- would be great to find a better method
- *
- *    returns: <f MEM>
- *    where MEM is the number of free bytes remaining in the Arduino's SRAM
- */
-      {
-         int v; 
-         Serial.print("<f ");
-         Serial.print((int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval));
-         Serial.println(">");
-      }
-      break;
-
    }
 }
 
+#endif
+
 
 /* ******************************************************************************* */
+
+
+/* **********************************************************************************
+ *  notifyDccSpeed() Callback for a multifunction decoder speed command.
+ *                   The received speed and direction are unpacked to separate values.
+ *
+ *  Inputs:
+ *    Addr        - Active decoder address.
+ *    AddrType    - DCC_ADDR_SHORT or DCC_ADDR_LONG.
+ *    Speed       - Decoder speed. 0               = Emergency stop
+ *                                 1               = Regular stop
+ *                                 2 to SpeedSteps = Speed step 1 to max.
+ *    Dir         - DCC_DIR_REV or DCC_DIR_FWD
+ *    SpeedSteps  - Highest speed, SPEED_STEP_14   =  15
+ *                                 SPEED_STEP_28   =  29
+ *                                 SPEED_STEP_128  = 127
+ *
+ *  Returns:
+ *    None
+ */
+void    notifyDccSpeed( uint16_t Addr, DCC_ADDR_TYPE AddrType, uint8_t Speed, DCC_DIRECTION Dir, DCC_SPEED_STEPS SpeedSteps )
+{
+   // if (Function13_value==1)
+   // {
+   //   Motor1Speed = (Speed & 0x7f );
+   //   if (Motor1Speed == 1)  Motor1Speed=0;
+   //   Motor1ForwardDir  = ForwardDir;
+   // }
+
+   // if (Function14_value==1)
+   // {
+   //   Motor2Speed = (Speed & 0x7f );
+   //   if (Motor2Speed == 1)  Motor2Speed=0;
+   //   Motor2ForwardDir  = ForwardDir;
+   // }
+}
 
 
 //   
