@@ -1,7 +1,8 @@
 
 /*
    TODO: check for maximum when changing CVs 31 ... 34
-   TODO: decide what to do when CV 30 is changed
+   TODO: check 'notifyDccCVChange' and '<W>' command: they use the same functionality
+   TODO:
 */
 
 
@@ -171,8 +172,8 @@ CVPair FactoryDefaultCVs [] =
 // {CV_29_CONFIG,          0},                                                                                 // Short Address 14 Speed Steps
 // {CV_29_CONFIG, CV29_F0_LOCATION},                                                                           // Short Address 28/128 Speed Steps
 // {CV_29_CONFIG, CV29_EXT_ADDRESSING | CV29_F0_LOCATION},                                                     // Long  Address 28/128 Speed Steps
-// {CV_29_CONFIG, CV29_ACCESSORY_DECODER | CV29_OUTPUT_ADDRESS_MODE | CV29_F0_LOCATION},                       // Accesory Decoder Short Address
-   {CV_29_CONFIG, CV29_ACCESSORY_DECODER | CV29_OUTPUT_ADDRESS_MODE | CV29_EXT_ADDRESSING | CV29_F0_LOCATION}, // Accesory Decoder  Long Address
+   {CV_29_CONFIG, CV29_ACCESSORY_DECODER | CV29_OUTPUT_ADDRESS_MODE | CV29_F0_LOCATION},                       // Accesory Decoder Short Address
+// {CV_29_CONFIG, CV29_ACCESSORY_DECODER | CV29_OUTPUT_ADDRESS_MODE | CV29_EXT_ADDRESSING | CV29_F0_LOCATION}, // Accesory Decoder  Long Address
 
    {CV_DECODER_MASTER_RESET, 0},
 
@@ -219,21 +220,21 @@ CVPair FactoryDefaultCVs [] =
    { 67, 100}, //     Waitmicros output highend
    { 68,   5}, //     Waitmicros output divider
    { 69, 100}, //     Blinkinterval this output
-   { 70,   0}, // LB4 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-   { 71,   0}, //     Maximum level this output
-   { 72,   0}, //     Waitmicros output highend
-   { 73,   0}, //     Waitmicros output divider
-   { 74,   0}, //     Blinkinterval this output
-   { 75,   0}, // LB5 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-   { 76,   0}, //     Maximum level this output
-   { 77,   0}, //     Waitmicros output highend
-   { 78,   0}, //     Waitmicros output divider
-   { 79,   0}, //     Blinkinterval this output
-   { 80,   0}, // LB6 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-   { 81,   0}, //     Maximum level this output
-   { 82,   0}, //     Waitmicros output highend
-   { 83,   0}, //     Waitmicros output divider
-   { 84,   0}, //     Blinkinterval this output
+   { 70,   1}, // LB4 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+   { 71,  50}, //     Maximum level this output
+   { 72, 100}, //     Waitmicros output highend
+   { 73,   5}, //     Waitmicros output divider
+   { 74, 100}, //     Blinkinterval this output
+   { 75,   1}, // LB5 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+   { 76,  50}, //     Maximum level this output
+   { 77, 100}, //     Waitmicros output highend
+   { 78,   5}, //     Waitmicros output divider
+   { 79, 100}, //     Blinkinterval this output
+   { 80,   1}, // LB6 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+   { 81,  50}, //     Maximum level this output
+   { 82, 100}, //     Waitmicros output highend
+   { 83,   5}, //     Waitmicros output divider
+   { 84, 100}, //     Blinkinterval this output
    { 85,   0}, // AX1 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 86,   0}, //     Maximum level this output
    { 87,   0}, //     Waitmicros output highend
@@ -627,7 +628,7 @@ void exec_function (int function, int pin, int FuncState)
 #ifdef _MONITOR_
 
 /* ******************************************************************************* */
-      // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+      // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On  ***
 /* **********************************************************************************
 
    <0>   all outputs: Off
@@ -640,39 +641,40 @@ void exec_function (int function, int pin, int FuncState)
    <C>   clear everything: Factory Default
    <D>   dumps everything: to Serial.Print
 
+   <f>   controls mobile engine decoder functions F0-F12: <f x y>
+   <F>   lists all funtions and settings for all outputs: <F>
+
    <M>   list the available SRAM on the chip
 
    <R>   reads a configuration variable: <R x>
    <W>   write a configuration variable: <W x y>
 
-   <f>   controls mobile engine decoder functions F0-F12: <f x y>
-   <F>   lists all funtions and settings for all outputs: <F>
-
 */
 void displayText()
 {
    Serial.println(""); // An extra empty line for clearness
-   Serial.println(F("Put in one of the following commands:"                                        ));
-   Serial.println(F("-----------------------------------------------------------------------------"));
-   // Serial.println(F("<A>: controls single outputs ( 1 to 16), as defined by CVs (including timing)"));
-   // Serial.println(F("** Example:  <A 14 1>  or  <A 14 ON>  both switch ON output 14 for set timers"));
-   // Serial.println(""); // An extra empty line for clearness
-   // Serial.println(F("<T>: controls turnouts, 1 to 8, where [T1 = A1 and A2], [T2 = A3 and A4], etc"));
-   // Serial.println(F("** Example:  <T 4 1>  or  <T 4 ON>  both switch ON A8 (Turnout 4) incl timing"));
-   // Serial.println(""); // An extra empty line for clearness
-   // Serial.println(F("<R>: reads a configuration variable byte from the connected accessory decoder"));
-   // Serial.println(F("*** Example:  <R 100>  reads the setting of CV100 (output 14 config)"         ));
-   // Serial.println(""); // An extra empty line for clearness
-   // Serial.println(F("<W>: writes a configuration variable byte  to the connected accessory decoder"));
-   // Serial.println(F("*** Example: <W 100 0>  (re)sets CV100 (output 14 config) to On/Off"          ));
-   // Serial.println(""); // An extra empty line for clearness
-   // Serial.println(F("<C>: clears all the settings in Eeprom and CVs, goes back to Factory Defaults"));
-   // Serial.println(F("<E>: writes all the settings to Eeprom"                                       ));
-   // Serial.println(F("<F>: returns the amount of free SRAM memory on the Arduino as <f MEM> (bytes)"));
-   // Serial.println(F("<s>: returns status messages, including output states, and the sketch version"));
-   Serial.println(F("-----------------------------------------------------------------------------"));
-   Serial.println(F("!! Include < and > in your command !!  -and-  !! spaces are also mandatory !!"));
-   Serial.println(""); // An extra empty line for clearness
+   Serial.println(F("Put in one of the following commands: "                        ));
+   Serial.println(F("--------------------------------------------------------------"));
+   Serial.println(F("<0>   all outputs: Off"                                        ));
+   Serial.println(F("<1>   all outputs:  On"                                        ));
+   Serial.println(F("<2>   all outputs: Blink Off"                                  ));
+   Serial.println(F("<3>   all outputs: Blink  On"                                  ));
+   Serial.println(F("<4>   all outputs: Fade Off"                                   ));
+   Serial.println(F("<5>   all outputs: Fade  On"                                   ));
+   Serial.println("");
+   Serial.println(F("<C>   clear everything: Factory Default"                       ));
+   Serial.println(F("<D>   dumps everything: to your monitor"                       ));
+   //rial.println("");
+   //rial.println(F("<f>   controls mobile engine decoder functions F0-F12: <f x y>"));
+   //rial.println(F("<F>   lists all funtions and settings for all outputs: <F>"  )  );
+   Serial.println("");
+   Serial.println(F("<M>   list the available SRAM on the chip"                     ));
+   Serial.println("");
+   Serial.println(F("<R>   reads a configuration variable: <R x>"                   ));
+   Serial.println(F("<W>   write a configuration variable: <W x y>"                 ));
+   Serial.println(F("--------------------------------------------------------------"));
+   Serial.println(F("Include < and > in your command   -and-   spaces are mandatory"));
+   Serial.println("");
 }
 
 
@@ -965,7 +967,7 @@ void parseCom( char *com )
 
                parseCom( recData ); //  Recursive action on CV value
 
-               _ML( "30" );
+               _PL( "30" );
                break;
             }
 
@@ -983,7 +985,7 @@ void parseCom( char *com )
                   calculateFtnQueue( i );
                }
 
-               _ML( "31 ... 34" );
+               _PL( "31 ... 34" );
                break;
             }
 
@@ -991,7 +993,7 @@ void parseCom( char *com )
             {
                calculateFtnQueue( (cv - 35) / 5 );
 
-               _ML( "35 ... 104" );
+               _PL( "35 ... 104" );
                break;
             }
 
@@ -999,13 +1001,13 @@ void parseCom( char *com )
             {
                calculateFtnQueue( 14 );
 
-               _ML( "105 ... 109" );
+               _PL( "105 ... 109" );
                break;
             }
 
             default:
             {
-               _ML( "default" );
+               _PL( "default" );
                break;
             }
          }
@@ -1066,7 +1068,7 @@ void parseCom( char *com )
  */
 void    notifyDccSpeed( uint16_t Addr, DCC_ADDR_TYPE AddrType, uint8_t Speed, DCC_DIRECTION Dir, DCC_SPEED_STEPS SpeedSteps )
 {
-   _PL("\t" "\t" "notifyDccSpeed");
+   _PL("\t" "notifyDccSpeed");
    // if (Function13_value==1)
    // {
    //   Motor1Speed = (Speed & 0x7f );
@@ -1113,7 +1115,8 @@ void    notifyDccSpeedRaw( uint16_t Addr, DCC_ADDR_TYPE AddrType, uint8_t Raw)
  */
 void    notifyDccReset(uint8_t hardReset )
 {
-   _PL("\t" "notifyDccReset");
+   _PP("\t" "notifyDccReset: ");
+   _2L(hardReset, DEC);
 }
 
 
@@ -1126,10 +1129,10 @@ void    notifyDccReset(uint8_t hardReset )
  *  Returns:
  *    None
  */
-void    notifyDccIdle(void)
-{
-   _PL("\t" "notifyDccIdle");
-}
+// void    notifyDccIdle(void)
+// {
+//    _PL("\t" "notifyDccIdle");
+// }
 
 
 /* **********************************************************************************
@@ -1245,7 +1248,13 @@ void    notifyDccAccTurnoutBoard( uint16_t BoardAddr, uint8_t OutputPair, uint8_
  */
 void    notifyDccAccTurnoutOutput( uint16_t Addr, uint8_t Direction, uint8_t OutputPower )
 {
-   _PL("\t" "notifyDccAccTurnoutOutput");
+   _PP("\t" "notifyDccAccTurnoutOutput: ");
+   _2P( Addr,  DEC );
+   // _PP( (AddrType == DCC_ADDR_SHORT) ? 'S' : 'L' );
+   _PP( "\t"  " Direction: " );
+   _2P( Direction,  DEC );
+   _PP( "\t"  " Power: " );
+   _2L( OutputPower,  DEC );
 }
 
 
@@ -1319,10 +1328,10 @@ void    notifyDccSigOutputState( uint16_t Addr, uint8_t State)
  *  Returns:
  *    None
  */
-void    notifyDccMsg( DCC_MSG * Msg )
-{
-   _PL("\t" "notifyDccMsg");
-}
+// void    notifyDccMsg( DCC_MSG * Msg )
+// {
+//    _PL("\t" "notifyDccMsg");
+// }
 
 
 /* **********************************************************************************
@@ -1341,17 +1350,17 @@ void    notifyDccMsg( DCC_MSG * Msg )
  *    1         - CV is valid.
  *    0         - CV is not valid.
  */
-uint8_t notifyCVValid( uint16_t CV, uint8_t Writable )
-{
-   _PL("\t" "notifyCVValid");
-   return 1;
-}
+// uint8_t notifyCVValid( uint16_t CV, uint8_t Writable )
+// {
+//    _PL("\t" "notifyCVValid");
+//    return 1;
+// }
 
 
-/*+
+/* **********************************************************************************
  *  notifyCVChange()  Called when a CV value is changed.
  *                    This is called whenever a CV's value is changed.
- *  notifyDccCVChange()  Called only when a CV value is changed by a Dcc packet or a internal lib function.
+ *  notifyDccCVChange()  Called only when a CV value is changed by a Dcc packet or a lib function.
  *                    it is NOT called if the CV is changed by means of the setCV() method.
  *                    Note: It is not called if notifyCVWrite() is defined
  *                    or if the value in the EEPROM is the same as the value
@@ -1370,13 +1379,6 @@ void notifyCVChange(uint16_t CV, uint8_t Value)
    _2P( CV, DEC    );
    _PP( " Value: " );
    _2L( Value, DEC );
-
-// eerst checken of CV #30 is >> on/off outputs
-// daarna checken CV #31 t/m 34 >> (her)bereken outputs
-
-// hierna kijken welke groep (0 t/m 14) betrokken is
-// dan kijken we welke groep herberekend moet worden
-
 }
 
 void    notifyDccCVChange( uint16_t CV, uint8_t Value)
@@ -1385,6 +1387,69 @@ void    notifyDccCVChange( uint16_t CV, uint8_t Value)
    _2P( CV,     DEC);
    _PP( " Value: " );
    _2L( Value,  DEC);
+
+
+//  THIS PART is almost the same as in the 'W' command....
+
+         switch ( CV )
+         {
+            case  30:
+            {
+               char recData[4] = " 0 ";
+
+               if (Value == 1) {recData[1] = 49;}
+               if (Value == 2) {recData[1] = 50;}
+               if (Value == 3) {recData[1] = 51;}
+               if (Value == 4) {recData[1] = 52;}
+               if (Value == 5) {recData[1] = 53;}
+
+               parseCom( recData ); //  Recursive action on CV value
+
+               _PL( "30" );
+               break;
+            }
+
+            case  31 ...  34:
+            {
+               // These are the absolute maximums allowed
+               M_maxLevel = Dcc.getCV( 31 ); //     Maximum level outputs (100 max)
+               M_highend  = Dcc.getCV( 32 ); //     Waitmicros  (250 * 100,000 max)
+               M_divider  = Dcc.getCV( 33 ); //     Waitmicros divider (standard 5)
+               M_interval = Dcc.getCV( 34 ); //     Standard blink interval  (* 10)
+
+               // Loop through all the settings for checking, correcting the values
+               for (int i = 0; i < numfpins; i++)
+               {
+                  calculateFtnQueue( i );
+               }
+
+               _PL( "31 ... 34" );
+               break;
+            }
+
+            case  35 ... 104:
+            {
+               calculateFtnQueue(( CV - 35 ) / 5 );
+
+               _PL( "35 ... 104" );
+               break;
+            }
+
+            case 105 ... 109:
+            {
+               calculateFtnQueue( 14 );
+
+               _PL( "105 ... 109" );
+               break;
+            }
+
+            default:
+            {
+               _PL( "default" );
+               break;
+            }
+         }
+
 }
 
 
@@ -1422,15 +1487,15 @@ void notifyCVResetFactoryDefault()
  *  Returns:
  *    None
  */
-void    notifyCVAck(void)
-{
-   _PL("\t" "notifyCVAck");
-}
+// void    notifyCVAck(void)
+// {
+//    _PL("\t" "notifyCVAck");
+// }
 
 
 /* **********************************************************************************
  *  notifyAdvancedCVAck() Called when a CV write must be acknowledged via Advanced Acknowledgement.
- *                This callback must send the Advanced Acknowledgement via RailComm.
+ *                        This callback must send the Advanced Acknowledgement via RailComm.
  *
  *  Inputs:
  *    None
@@ -1453,9 +1518,10 @@ void    notifyAdvancedCVAck(void)
  *  Returns:
  *    None
  */
-void    notifyServiceMode(bool)
+void    notifyServiceMode(bool _state)
 {
-   _PL("\t" "notifyServiceMode");
+   _PP("\t" "notifyServiceMode: ");
+   _PL(_state ? '0':'1');
 }
 
 
