@@ -170,9 +170,9 @@ CVPair FactoryDefaultCVs [] =
 //  Speed Steps don't matter for this decoder, only for loc decoders
 //  ONLY uncomment 1 CV_29_CONFIG line below as approprate DEFAULT IS SHORT ADDRESS
 // {CV_29_CONFIG,          0},                                                                                 // Short Address 14 Speed Steps
-// {CV_29_CONFIG, CV29_F0_LOCATION},                                                                           // Short Address 28/128 Speed Steps
+   {CV_29_CONFIG, CV29_F0_LOCATION},                                                                           // Short Address 28/128 Speed Steps
 // {CV_29_CONFIG, CV29_EXT_ADDRESSING | CV29_F0_LOCATION},                                                     // Long  Address 28/128 Speed Steps
-   {CV_29_CONFIG, CV29_ACCESSORY_DECODER | CV29_OUTPUT_ADDRESS_MODE | CV29_F0_LOCATION},                       // Accesory Decoder Short Address
+// {CV_29_CONFIG, CV29_ACCESSORY_DECODER | CV29_OUTPUT_ADDRESS_MODE | CV29_F0_LOCATION},                       // Accesory Decoder Short Address
 // {CV_29_CONFIG, CV29_ACCESSORY_DECODER | CV29_OUTPUT_ADDRESS_MODE | CV29_EXT_ADDRESSING | CV29_F0_LOCATION}, // Accesory Decoder  Long Address
 
    {CV_DECODER_MASTER_RESET, 0},
@@ -314,7 +314,8 @@ void setup()
 
    Dcc.pin(digitalPinToInterrupt(FunctionPinDcc), FunctionPinDcc, false);
 
-   Dcc.init(MAN_ID_DIY, 201, FLAGS_OUTPUT_ADDRESS_MODE | FLAGS_DCC_ACCESSORY_DECODER, CV_To_Store_SET_CV_Address);
+   // Dcc.init(MAN_ID_DIY, 201, FLAGS_OUTPUT_ADDRESS_MODE | FLAGS_DCC_ACCESSORY_DECODER, CV_To_Store_SET_CV_Address);
+   Dcc.init(MAN_ID_DIY, 201, FLAGS_MY_ADDRESS_ONLY, CV_To_Store_SET_CV_Address);
 
    #if defined(DECODER_LOADED)
 
@@ -535,91 +536,45 @@ void calculateFtnQueue( int number )
 /* ******************************************************************************* */
 
 
-void exec_function (int function, int pin, int FuncState)
+volatile int prevFuncState = 25;  // Previous state of light function.
+
+void exec_function (int function, int FuncState)
 {
+   if ( function == -1 )
+   {
+      if ( prevFuncState != FuncState)
+      {
+         prevFuncState = FuncState; // Something changed state
 
-  switch ( Dcc.getCV( 35 + ( function * 5 ) ) )
-  {
+         char recData[4] = " 0 ";
+         recData[1] = 48 + FuncState;
 
-   // case 0:    // On - Off LED
-   //    digitalWrite (pin, FuncState);
-   //    ftn_queue[function].inuse = 0;
-   //    break;
+         parseCom( recData );       // Action on CV value
+      }
+   }
+   else
+   {
+      if ( ftn_queue[ function ].inUse != FuncState )
+      {
+         ftn_queue[ function ].inUse = FuncState;
+      }
+   }
 
-   //  case 1:    // Blinking LED
-   //    if ((ftn_queue[function].inuse==0) && (FuncState==1))  {
-   //      ftn_queue[function].inuse = 1;
-   //      ftn_queue[function].start_value = 0;
-   //      digitalWrite(pin, 0);
-   //      ftn_queue[function].stop_value = int(Dcc.getCV( 33+(function*5)));
-   //    } else {
-   //        if ((ftn_queue[function].inuse==1) && (FuncState==0)) {
-   //          ftn_queue[function].inuse = 0;
-   //          digitalWrite(pin, 0);
-   //        }
-   //      }
-   //    break;
+   // _PP("\t" "function: " );
+   // _2P(function,  DEC);
+   // _PP("\t" "FuncState: ");
+   // _2P(FuncState, DEC);
+   // _PP("\t" "cvValue: "  );
+   // _2P(cvValue,   DEC);
+   // _PP("\t" "prevFuncState: ");
+   // _2L(prevFuncState,     DEC);
 
-   //  case 2:    // Servo
-   //    if (ftn_queue[function].inuse == 0)  {
-	//     ftn_queue[function].inuse = 1;
-	// 	servo[function].attach(pin);
-	//   }
-   //    if (FuncState==1) ftn_queue[function].increment = char ( Dcc.getCV( 31+(function*5)));
-   //      else ftn_queue[function].increment = - char(Dcc.getCV( 31+(function*5)));
-   //    if (FuncState==1) ftn_queue[function].stop_value = Dcc.getCV( 33+(function*5));
-   //      else ftn_queue[function].stop_value = Dcc.getCV( 32+(function*5));
-   //    break;
 
-   //  case 3:    // Blinking LED PAIR
-   //    if ((ftn_queue[function].inuse==0) && (FuncState==1))  {
-   //      ftn_queue[function].inuse = 1;
-   //      ftn_queue[function].start_value = 0;
-   //      digitalWrite(fpins[function], 0);
-   //      digitalWrite(fpins[function+1], 1);
-   //      ftn_queue[function].stop_value = int(Dcc.getCV( 33+(function*5)));
-   //    } else {
-   //        if (FuncState==0) {
-   //          ftn_queue[function].inuse = 0;
-   //          digitalWrite(fpins[function], 0);
-   //          digitalWrite(fpins[function+1], 0);
-   //        }
-   //      }
-   //    break;
+// F0 alle lichten aan of uit  -->  FuncState 1 of 0  -->  CV 30
+// F1 LS1 aan of uit  -->  FuncState 1 of 0  -->  CV 35  -->  ftn_queue[0]  -->  function
 
-   //  case 4:    // Pulse Output based on Rate*10 Milliseconds
-   //    if ((ftn_queue[function].inuse==0) && (FuncState==1)) {  //First Turn On Detected
-   //      digitalWrite(fpins[function], 1);
-	// 	delay (10*ftn_queue[function].increment);
-   //      digitalWrite(fpins[function], 0);
-	// 	ftn_queue[function].inuse = 1;                    //inuse set to 1 says we already pulsed
-   //    } else 
-   //        if (FuncState==0)  ftn_queue[function].inuse = 0;
-   //    break;
 
-   //  case 5:    // Fade On
-   //    #define fadedelay 24
-   //    if ((ftn_queue[function].inuse==0) && (FuncState==1))  {
-   //      ftn_queue[function].inuse = 1;
-   //      for (t=0; t<ftn_queue[function].stop_value; t+=ftn_queue[function].increment) {
-   //        digitalWrite( fpins[function], 1);
-   //        delay(fadedelay*(t/(1.*ftn_queue[function].stop_value)));
-   //        digitalWrite( fpins[function], 0);
-   //        delay(fadedelay-(fadedelay*(t/(1.*ftn_queue[function].stop_value))));
-   //      }
-   //      digitalWrite( fpins[function],  1 );
-   //    } else {
-   //        if ((ftn_queue[function].inuse==1) && (FuncState==0)) {
-   //          ftn_queue[function].inuse = 0;
-   //          digitalWrite(fpins[function], 0);
-   //        }
-   //      }
-   //    break;
-
-  }
 }
-
-
 
 
 /* ******************************************************************************* */
@@ -1068,38 +1023,15 @@ void parseCom( char *com )
  */
 void    notifyDccSpeed( uint16_t Addr, DCC_ADDR_TYPE AddrType, uint8_t Speed, DCC_DIRECTION Dir, DCC_SPEED_STEPS SpeedSteps )
 {
-   _PL("\t" "notifyDccSpeed");
-   // if (Function13_value==1)
-   // {
-   //   Motor1Speed = (Speed & 0x7f );
-   //   if (Motor1Speed == 1)  Motor1Speed=0;
-   //   Motor1ForwardDir  = ForwardDir;
-   // }
-
-   // if (Function14_value==1)
-   // {
-   //   Motor2Speed = (Speed & 0x7f );
-   //   if (Motor2Speed == 1)  Motor2Speed=0;
-   //   Motor2ForwardDir  = ForwardDir;
-   // }
-}
-
-
-/* **********************************************************************************
- *  notifyDccSpeedRaw() Callback for a multifunction decoder speed command.
- *                      The value in Raw is the packed speed command.
- *
- *  Inputs:
- *    Addr        - Active decoder address.
- *    AddrType    - DCC_ADDR_SHORT or DCC_ADDR_LONG.
- *    Raw         - Raw decoder speed command.
- *
- *  Returns:
- *    None
- */
-void    notifyDccSpeedRaw( uint16_t Addr, DCC_ADDR_TYPE AddrType, uint8_t Raw)
-{
-   _PL("\t" "notifyDccSpeedRaw");
+   // _PP("\t" "notifyDccSpeed Addr: ");
+   // _2P(Addr, DEC);
+   // _PP(" " + (AddrType == DCC_ADDR_SHORT) ? 'S' : 'L' );
+   // _PP("\t" "Speed: ");
+   // _2P(Speed, DEC);
+   // _PP("\t" "Dir: ");
+   // _PP(Dir);
+   // _PP("\t" "SpeedSteps: ");
+   // _2L(SpeedSteps, DEC);
 }
 
 
@@ -1113,25 +1045,10 @@ void    notifyDccSpeedRaw( uint16_t Addr, DCC_ADDR_TYPE AddrType, uint8_t Raw)
  *  Returns:
  *    None
  */
-void    notifyDccReset(uint8_t hardReset )
-{
-   _PP("\t" "notifyDccReset: ");
-   _2L(hardReset, DEC);
-}
-
-
-/* **********************************************************************************
- *  notifyDccIdle() Callback for a DCC idle command.
- *
- *  Inputs:
- *    None
- *
- *  Returns:
- *    None
- */
-// void    notifyDccIdle(void)
+// void    notifyDccReset(uint8_t hardReset )
 // {
-//    _PL("\t" "notifyDccIdle");
+//    _PP("\t" "notifyDccReset: ");
+//    _2L(hardReset, DEC);
 // }
 
 
@@ -1157,104 +1074,48 @@ void    notifyDccReset(uint8_t hardReset )
  */
 void    notifyDccFunc( uint16_t Addr, DCC_ADDR_TYPE AddrType, FN_GROUP FuncGrp, uint8_t FuncState)
 {
-   _PP( "\t" "notifyDccFunc: Addr: " );
-   _2P( Addr,  DEC );
-   _PP( (AddrType == DCC_ADDR_SHORT) ? 'S' : 'L' );
-   _PP( "\t"  " Function Group: " );
-   _2P( FuncGrp,  DEC );
-   _PP( "\t"  " State: " );
-   _2L( FuncState,  DEC );
+   // _PP( "\t" "notifyDccFunc Addr: " );
+   // _2P( Addr,  DEC );
+   // _PP( (AddrType == DCC_ADDR_SHORT) ? 'S' : 'L' );
+   // _PP( "\t"  " Function Group: " );
+   // _2P( FuncGrp,  DEC );
+   // _PP( "\t"  " State: " );
+   // _2L( FuncState,  DEC );
 
    switch(FuncGrp)
    {
       case FN_0_4:    //Function Group 1 F0 F4 F3 F2 F1
-         exec_function(  0, FunctionPin0 , (FuncState & FN_BIT_00)>>4 );
-         exec_function(  1, FunctionPin1 , (FuncState & FN_BIT_01)    );
-         exec_function(  2, FunctionPin2 , (FuncState & FN_BIT_02)>>1 );
-         exec_function(  3, FunctionPin3 , (FuncState & FN_BIT_03)>>2 );
-         exec_function(  4, FunctionPin4 , (FuncState & FN_BIT_04)>>3 );
+         exec_function( -1, (FuncState & FN_BIT_00)>>4 );
+         exec_function(  0, (FuncState & FN_BIT_01)    );
+         exec_function(  1, (FuncState & FN_BIT_02)>>1 );
+         exec_function(  2, (FuncState & FN_BIT_03)>>2 );
+         exec_function(  3, (FuncState & FN_BIT_04)>>3 );
          break;
 
-      case FN_5_8:    //Function Group 1 S FFFF == 1 F8 F7 F6 F5  &  == 0  F12 F11 F10 F9 F8
-         exec_function(  5, FunctionPin5 , (FuncState & FN_BIT_05)    );
-         exec_function(  6, FunctionPin6 , (FuncState & FN_BIT_06)>>1 );
-         exec_function(  7, FunctionPin7 , (FuncState & FN_BIT_07)>>2 );
-         exec_function(  8, FunctionPin8 , (FuncState & FN_BIT_08)>>3 );
+      case FN_5_8:    //Function Group 1 S FFFF == 1 F8 F7 F6 F5  &  == 0  F12 F11 F10 F9
+         exec_function(  4, (FuncState & FN_BIT_05)    );
+         exec_function(  5, (FuncState & FN_BIT_06)>>1 );
+         exec_function(  6, (FuncState & FN_BIT_07)>>2 );
+         exec_function(  7, (FuncState & FN_BIT_08)>>3 );
          break;
 
       case FN_9_12:
-         exec_function(  9, FunctionPin9 , (FuncState & FN_BIT_09)    );
-         exec_function( 10, FunctionPin10, (FuncState & FN_BIT_10)>>1 );
-         exec_function( 11, FunctionPin11, (FuncState & FN_BIT_11)>>2 );
-         exec_function( 12, FunctionPin12, (FuncState & FN_BIT_12)>>3 );
+         exec_function(  8, (FuncState & FN_BIT_09)    );
+         exec_function(  9, (FuncState & FN_BIT_10)>>1 );
+         exec_function( 10, (FuncState & FN_BIT_11)>>2 );
+         exec_function( 11, (FuncState & FN_BIT_12)>>3 );
          break;
 
       case FN_13_20:   //Function Group 2 FuncState == F20-F13 Function Control
-         exec_function( 13, FunctionPin13, (FuncState & FN_BIT_13)    );
-         exec_function( 14, FunctionPin14, (FuncState & FN_BIT_14)>>1 );
-         exec_function( 15, FunctionPin15, (FuncState & FN_BIT_15)>>2 );
-         //ec_function( 16, FunctionPin16, (FuncState & FN_BIT_16)>>3 );
+         exec_function( 12, (FuncState & FN_BIT_13)    );
+         exec_function( 13, (FuncState & FN_BIT_14)>>1 );
+         // c_function( 15, (FuncState & FN_BIT_15)>>2 );
+         // c_function( 16, (FuncState & FN_BIT_16)>>3 );
          break;
 
       case FN_21_28:
          break;	
    }
-}
-
-
-/* **********************************************************************************
- *  notifyDccAccTurnoutBoard() Board oriented callback for a turnout accessory decoder.
- *                             Most useful when CV29_OUTPUT_ADDRESS_MODE is not set.
- *                             Decoders of this type have 4 paired turnout outputs per board.
- *                             OutputPower is 1 if the power is on, and 0 otherwise.
- *
- *  Inputs:
- *    BoardAddr   - Per board address. Equivalent to CV 1 LSB & CV 9 MSB.
- *    OutputPair  - Output pair number. It has a range of 0 to 3.
- *                  Equivalent to upper 2 bits of the 3 DDD bits in the accessory packet.
- *    Direction   - Turnout direction. It has a value of 0 or 1.
- *                  It is equivalent to bit 0 of the 3 DDD bits in the accessory packet.
- *    OutputPower - Output On/Off. Equivalent to packet C bit. It has these values:
- *                  0 - Output pair is off.
- *                  1 - Output pair is on.
- *
- *  Returns:
- *    None
- */
- 
-void    notifyDccAccTurnoutBoard( uint16_t BoardAddr, uint8_t OutputPair, uint8_t Direction, uint8_t OutputPower )
-{
-   _PL("\t" "notifyDccAccTurnoutBoard");
-}
-
-
-/* **********************************************************************************
- *  notifyDccAccTurnoutOutput() Output oriented callback for a turnout accessory decoder.
- *                              Most useful when CV29_OUTPUT_ADDRESS_MODE is not set.
- *                              Decoders of this type have 4 paired turnout outputs per board.
- *                              OutputPower is 1 if the power is on, and 0 otherwise.
- *
- *  Inputs:
- *    Addr        - Per output address. There will be 4 Addr addresses
- *                  per board for a standard accessory decoder with 4 output pairs.
- *    Direction   - Turnout direction. It has a value of 0 or 1.
- *                  Equivalent to bit 0 of the 3 DDD bits in the accessory packet.
- *    OutputPower - Output On/Off. Equivalent to packet C bit. It has these values:
- *                  0 - Output is off.
- *                  1 - Output is on.
- *
- *  Returns:
- *    None
- */
-void    notifyDccAccTurnoutOutput( uint16_t Addr, uint8_t Direction, uint8_t OutputPower )
-{
-   _PP("\t" "notifyDccAccTurnoutOutput: ");
-   _2P( Addr,  DEC );
-   // _PP( (AddrType == DCC_ADDR_SHORT) ? 'S' : 'L' );
-   _PP( "\t"  " Direction: " );
-   _2P( Direction,  DEC );
-   _PP( "\t"  " Power: " );
-   _2L( OutputPower,  DEC );
 }
 
 
@@ -1296,65 +1157,6 @@ void    notifyDccAccOutputAddrSet( uint16_t Addr)
 {
    _PL("\t" "notifyDccAccOutputAddrSet");
 }
-
-
-/* **********************************************************************************
- *  notifyDccSigOutputState() Callback for a signal aspect accessory decoder.
- *                      Defined in S-9.2.1 as the Extended Accessory Decoder Control Packet.
- *
- *  Inputs:
- *    Addr        - Decoder address.
- *    State       - 6 bit command equivalent to S-9.2.1 00XXXXXX.
- *
- *  Returns:
- *    None
- */
-void    notifyDccSigOutputState( uint16_t Addr, uint8_t State)
-{
-   _PL("\t" "notifyDccSigOutputState");
-}
-
-
-/* **********************************************************************************
- *  notifyDccMsg() Raw DCC packet callback.
- *                 Called with raw DCC packet bytes.
- *
- *  Inputs:
- *    Msg        - Pointer to DCC_MSG structure. The values are:
- *                 Msg->Size          - Number of Data bytes in the packet.
- *                 Msg->PreambleBits  - Number of preamble bits in the packet.
- *                 Msg->Data[]        - Array of data bytes in the packet.
- *
- *  Returns:
- *    None
- */
-// void    notifyDccMsg( DCC_MSG * Msg )
-// {
-//    _PL("\t" "notifyDccMsg");
-// }
-
-
-/* **********************************************************************************
- *  notifyCVValid() Callback to determine if a given CV is valid.
- *                  This is called when the library needs to determine
- *                  if a CV is valid. Note: If defined, this callback
- *                  MUST determine if a CV is valid and return the
- *                  appropriate value. If this callback is not defined,
- *                  the library will determine validity.
- *
- *  Inputs:
- *    CV        - CV number.
- *    Writable  - 1 for CV writes. 0 for CV reads.
- *
- *  Returns:
- *    1         - CV is valid.
- *    0         - CV is not valid.
- */
-// uint8_t notifyCVValid( uint16_t CV, uint8_t Writable )
-// {
-//    _PL("\t" "notifyCVValid");
-//    return 1;
-// }
 
 
 /* **********************************************************************************
@@ -1476,58 +1278,8 @@ void notifyCVResetFactoryDefault()
 }
 
 
-/* **********************************************************************************
- *  notifyCVAck() Called when a CV write must be acknowledged.
- *                This callback must increase the current drawn by this
- *                decoder by at least 60mA for 6ms +/- 1ms.
- *
- *  Inputs:
- *    None
- *                                                                                                        *
- *  Returns:
- *    None
- */
-// void    notifyCVAck(void)
-// {
-//    _PL("\t" "notifyCVAck");
-// }
-
-
-/* **********************************************************************************
- *  notifyAdvancedCVAck() Called when a CV write must be acknowledged via Advanced Acknowledgement.
- *                        This callback must send the Advanced Acknowledgement via RailComm.
- *
- *  Inputs:
- *    None
- *                                                                                                        *
- *  Returns:
- *    None
- */
-void    notifyAdvancedCVAck(void)
-{
-   _PL("\t" "notifyAdvancedCVAck");
-}
-
-
-/* **********************************************************************************
- *  notifyServiceMode(bool) Called when state of 'inServiceMode' changes
- *
- *  Inputs:
- *    bool  state of inServiceMode
- *                                                                                                      *
- *  Returns:
- *    None
- */
-void    notifyServiceMode(bool _state)
-{
-   _PP("\t" "notifyServiceMode: ");
-   _PL(_state ? '0':'1');
-}
-
-
 #if defined (__cplusplus)
 }
 #endif
-
 
 //   
