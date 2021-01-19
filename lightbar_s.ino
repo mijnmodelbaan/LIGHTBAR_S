@@ -2,7 +2,7 @@
 /*
    TODO: check for maximum when changing CVs 31 ... 34
    TODO: check 'notifyDccCVChange' and '<W>' command: they use the same functionality
-   TODO:
+   TODO: notifyDccFunc testen / checken / aanpassen
 */
 
 
@@ -13,21 +13,21 @@
 
 #include <SoftPWM.h>
 
-SOFTPWM_DEFINE_CHANNEL( 0, DDRD, PORTD, PORTD7);  //Arduino pin D7
-SOFTPWM_DEFINE_CHANNEL( 1, DDRC, PORTC, PORTC1);  //Arduino pin A1
-SOFTPWM_DEFINE_CHANNEL( 2, DDRD, PORTD, PORTD5);  //Arduino pin D5
-SOFTPWM_DEFINE_CHANNEL( 3, DDRD, PORTD, PORTD3);  //Arduino pin D3
-SOFTPWM_DEFINE_CHANNEL( 4, DDRD, PORTD, PORTD6);  //Arduino pin D6
-SOFTPWM_DEFINE_CHANNEL( 5, DDRC, PORTC, PORTC0);  //Arduino pin A0
-SOFTPWM_DEFINE_CHANNEL( 6, DDRD, PORTD, PORTD4);  //Arduino pin D4
-SOFTPWM_DEFINE_CHANNEL( 7, DDRC, PORTC, PORTC3);  //Arduino pin A3
-SOFTPWM_DEFINE_CHANNEL( 8, DDRC, PORTC, PORTC4);  //Arduino pin A4
-SOFTPWM_DEFINE_CHANNEL( 9, DDRC, PORTC, PORTC5);  //Arduino pin A5
-SOFTPWM_DEFINE_CHANNEL(10, DDRB, PORTB, PORTB0);  //Arduino pin D8
-SOFTPWM_DEFINE_CHANNEL(11, DDRB, PORTB, PORTB1);  //Arduino pin D9
-SOFTPWM_DEFINE_CHANNEL(12, DDRB, PORTB, PORTB2);  //Arduino pin 10
-SOFTPWM_DEFINE_CHANNEL(13, DDRC, PORTC, PORTC2);  //Arduino pin A2
-SOFTPWM_DEFINE_CHANNEL(14, DDRB, PORTB, PORTB5);  //Arduino pin 13
+SOFTPWM_DEFINE_CHANNEL( 1, DDRD, PORTD, PORTD7);  //Arduino pin D7 --> LS1
+SOFTPWM_DEFINE_CHANNEL( 2, DDRC, PORTC, PORTC1);  //Arduino pin A1 --> LS2
+SOFTPWM_DEFINE_CHANNEL( 3, DDRD, PORTD, PORTD5);  //Arduino pin D5 --> LS3
+SOFTPWM_DEFINE_CHANNEL( 4, DDRD, PORTD, PORTD3);  //Arduino pin D3 --> LS4
+SOFTPWM_DEFINE_CHANNEL( 5, DDRD, PORTD, PORTD6);  //Arduino pin D6 --> LB1
+SOFTPWM_DEFINE_CHANNEL( 6, DDRC, PORTC, PORTC0);  //Arduino pin A0 --> LB2
+SOFTPWM_DEFINE_CHANNEL( 7, DDRD, PORTD, PORTD4);  //Arduino pin D4 --> LB3
+SOFTPWM_DEFINE_CHANNEL( 8, DDRC, PORTC, PORTC3);  //Arduino pin A3 --> LB4
+SOFTPWM_DEFINE_CHANNEL( 9, DDRC, PORTC, PORTC4);  //Arduino pin A4 --> LB5
+SOFTPWM_DEFINE_CHANNEL(10, DDRC, PORTC, PORTC5);  //Arduino pin A5 --> LB6
+SOFTPWM_DEFINE_CHANNEL(11, DDRB, PORTB, PORTB0);  //Arduino pin D8 --> AX1
+SOFTPWM_DEFINE_CHANNEL(12, DDRB, PORTB, PORTB1);  //Arduino pin D9 --> AX2
+SOFTPWM_DEFINE_CHANNEL(13, DDRB, PORTB, PORTB2);  //Arduino pin 10 --> AX3
+SOFTPWM_DEFINE_CHANNEL(14, DDRC, PORTC, PORTC2);  //Arduino pin A2 --> AX4
+SOFTPWM_DEFINE_CHANNEL(15, DDRB, PORTB, PORTB5);  //Arduino pin 13 --> LED
 
 SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS( 15, 100);
 
@@ -92,9 +92,9 @@ DCC_MSG  Packet ;
 
 
 int tim_delay =  500;
-int numfpins  =   15;
-byte fpins [] = {  7,  15,   5,   3,   6,  14,   4,  17,  18,  19,   8,   9,  10,  16,  13};
-//  pinnames:  > PD7, PC1, PD5, PD3, PD6, PC0, PD4, PC3, PC4, PC5, PB0, PB1, PB2, PC2, PB5 <
+int numfpins  =   16;
+byte fpins [] = { 11,   7,  15,   5,   3,   6,  14,   4,  17,  18,  19,   8,   9,  10,  16,  13,  12};
+//  pinnames:  > DNU, PD7, PC1, PD5, PD3, PD6, PC0, PD4, PC3, PC4, PC5, PB0, PB1, PB2, PC2, PB5, DNU <
 
 const int FunctionPinRx  =  0;  // PD0  Tx0
 const int FunctionPinTx  =  1;  // PD1  Rx1
@@ -150,7 +150,7 @@ struct QUEUE
    unsigned long      blinkInterval;   // interval in millis()
    int                     ledState;   // state of this output
 };
-QUEUE volatile *ftn_queue = new QUEUE[16];
+QUEUE volatile *ftn_queue = new QUEUE[17];
 
 struct CVPair
 {
@@ -180,57 +180,57 @@ CVPair FactoryDefaultCVs [] =
    {CV_To_Store_SET_CV_Address,      SET_CV_Address       & 0xFF },  // LSB Set CV Address
    {CV_To_Store_SET_CV_Address + 1, (SET_CV_Address >> 8) & 0x3F },  // MSB Set CV Address
 
-   { 30,   1}, // GEN 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+   { 30,   0}, // GEN 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 31,  50}, //     Maximum level outputs (100 max)
    { 32, 100}, //     Waitmicros  (250 * 100,000 max)
    { 33,   5}, //     Waitmicros divider (standard 5)
    { 34, 100}, //     Standard blink interval  (* 10)
-   { 35,   1}, // LS1 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+   { 35,   0}, // LS1 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 36,  50}, //     Maximum level this output
    { 37, 100}, //     Waitmicros output highend
    { 38,   5}, //     Waitmicros output divider
    { 39, 100}, //     Blinkinterval this output
-   { 40,   1}, // LS2 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+   { 40,   0}, // LS2 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 41,  50}, //     Maximum level this output
    { 42, 100}, //     Waitmicros output highend
    { 43,   5}, //     Waitmicros output divider
    { 44, 100}, //     Blinkinterval this output
-   { 45,   1}, // LS3 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+   { 45,   0}, // LS3 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 46,  50}, //     Maximum level this output
    { 47, 100}, //     Waitmicros output highend
    { 48,   5}, //     Waitmicros output divider
    { 49, 100}, //     Blinkinterval this output
-   { 50,   1}, // LS4 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+   { 50,   0}, // LS4 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 51,  50}, //     Maximum level this output
    { 52, 100}, //     Waitmicros output highend
    { 53,   5}, //     Waitmicros output divider
    { 54, 100}, //     Blinkinterval this output
-   { 55,   1}, // LB1 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+   { 55,   0}, // LB1 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 56,  50}, //     Maximum level this output
    { 57, 100}, //     Waitmicros output highend
    { 58,   5}, //     Waitmicros output divider
    { 59, 100}, //     Blinkinterval this output
-   { 60,   1}, // LB2 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+   { 60,   0}, // LB2 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 61,  50}, //     Maximum level this output
    { 62, 100}, //     Waitmicros output highend
    { 63,   5}, //     Waitmicros output divider
    { 64, 100}, //     Blinkinterval this output
-   { 65,   1}, // LB3 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+   { 65,   0}, // LB3 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 66,  50}, //     Maximum level this output
    { 67, 100}, //     Waitmicros output highend
    { 68,   5}, //     Waitmicros output divider
    { 69, 100}, //     Blinkinterval this output
-   { 70,   1}, // LB4 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+   { 70,   0}, // LB4 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 71,  50}, //     Maximum level this output
    { 72, 100}, //     Waitmicros output highend
    { 73,   5}, //     Waitmicros output divider
    { 74, 100}, //     Blinkinterval this output
-   { 75,   1}, // LB5 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+   { 75,   0}, // LB5 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 76,  50}, //     Maximum level this output
    { 77, 100}, //     Waitmicros output highend
    { 78,   5}, //     Waitmicros output divider
    { 79, 100}, //     Blinkinterval this output
-   { 80,   1}, // LB6 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+   { 80,   0}, // LB6 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 81,  50}, //     Maximum level this output
    { 82, 100}, //     Waitmicros output highend
    { 83,   5}, //     Waitmicros output divider
@@ -260,6 +260,11 @@ CVPair FactoryDefaultCVs [] =
    {107, 100}, //     Waitmicros output highend
    {108,   5}, //     Waitmicros output divider
    {109, 100}, //     Blinkinterval this output
+   {110,   0}, // DNU 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
+   {111,  50}, //     Maximum level this output
+   {112, 100}, //     Waitmicros output highend
+   {113,   5}, //     Waitmicros output divider
+   {114, 100}, //     Blinkinterval this output
 };
 
 volatile uint8_t FactoryDefaultCVIndex = sizeof(FactoryDefaultCVs) / sizeof(CVPair);
@@ -276,11 +281,10 @@ volatile uint8_t M_interval = Dcc.getCV( 34 );
 
 void setup()
 {
-
    noInterrupts();
 
    // initialize the digital pins as outputs
-   for (int i = 0; i < numfpins; i++) 
+   for (int i = 1; i <= numfpins; i++) 
    {
       digitalWrite(fpins[i], 0);  // Switch the pin off first.
       pinMode(fpins[i], OUTPUT);  // Then set it as an output.
@@ -325,7 +329,7 @@ void setup()
 
          for (int i = 0; i < FactoryDefaultCVIndex; i++)
          {
-            Dcc.setCV(FactoryDefaultCVs[i].CV, FactoryDefaultCVs[i].Value);
+            Dcc.setCV(FactoryDefaultCVs[ i ].CV, FactoryDefaultCVs[ i ].Value);
 
             digitalWrite(FunctionPinLed, 1);
             delay (tim_delay);
@@ -343,7 +347,7 @@ void setup()
    M_interval = Dcc.getCV( 34 ); //     Standard blink interval  (* 10)
 
    // Loop through all the settings for checking and correcting
-   for (int i = 0; i < numfpins; i++) 
+   for (int i = 1; i < numfpins; i++)
    {
       calculateFtnQueue( i );
    }
@@ -368,7 +372,6 @@ void setup()
    digitalWrite(FunctionPinLed, 1);
 
    interrupts();  // Ready to rumble....
-
 }
 
 
@@ -377,39 +380,38 @@ void setup()
 
 void loop()
 {
-
    unsigned long currentMillis = millis();
    unsigned long currentMicros = micros();
 
    Dcc.process();
 
-   for (int i = 0; i < numfpins; i++) 
+   for (int i = 1; i < numfpins-1; i++)
    {
-      switch (ftn_queue[ i ].inUse )
+      switch ( ftn_queue[ i ].inUse )
       {
          case 1:     // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
          {
-            Palatis::SoftPWM.set( i, ftn_queue[i].maxLevel);
+            Palatis::SoftPWM.set( i, ftn_queue[ i ].maxLevel);
             break;
          }
 
          case 3:     // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
          { 
-            if (currentMillis - ftn_queue[i].previousMillis >= ftn_queue[i].blinkInterval)
+            if (currentMillis - ftn_queue[ i ].previousMillis >= ftn_queue[ i ].blinkInterval)
             {
                // Save the last time you blinked the LED
-               ftn_queue[i].previousMillis = currentMillis;
+               ftn_queue[ i ].previousMillis = currentMillis;
 
                // If the LED is off turn it on and vice-versa
-               if (ftn_queue[i].ledState == LOW)
+               if (ftn_queue[ i ].ledState == LOW)
                {
-                  Palatis::SoftPWM.set( i, ftn_queue[i].maxLevel);
-                  ftn_queue[i].ledState =  HIGH;
+                  Palatis::SoftPWM.set( i, ftn_queue[ i ].maxLevel);
+                  ftn_queue[ i ].ledState = HIGH;
                }
                else
                {
-                  ftn_queue[i].ledState =   LOW;
-                  Palatis::SoftPWM.set( i,   0);
+                  ftn_queue[ i ].ledState =  LOW;
+                  Palatis::SoftPWM.set( i,    0);
                }
             }
             break;
@@ -417,18 +419,18 @@ void loop()
 
          case 5:     // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
          { 
-            if (currentMicros - ftn_queue[i].previousMicros > ftn_queue[i].waitMicros)
+            if (currentMicros - ftn_queue[ i ].previousMicros > ftn_queue[ i ].waitMicros)
             {
-               ftn_queue[i].previousMicros = currentMicros;
+               ftn_queue[ i ].previousMicros = currentMicros;
 
-               if ((ftn_queue[i].fadeCounter > ftn_queue[i].maxLevel - 1) || (ftn_queue[i].fadeCounter < 1))
+               if ((ftn_queue[ i ].fadeCounter > ftn_queue[ i ].maxLevel - 1) || (ftn_queue[ i ].fadeCounter < 1))
                {
-                  ftn_queue[i].upDown = !ftn_queue[i].upDown;
+                  ftn_queue[ i ].upDown = !ftn_queue[ i ].upDown;
                }
 
-               if (ftn_queue[i].upDown == true) { ftn_queue[i].fadeCounter++; } else { ftn_queue[i].fadeCounter--; }
+               if (ftn_queue[ i ].upDown == true) { ftn_queue[ i ].fadeCounter++; } else { ftn_queue[ i ].fadeCounter--; }
 
-               Palatis::SoftPWM.set( i, ftn_queue[i].fadeCounter);
+               Palatis::SoftPWM.set( i, ftn_queue[ i ].fadeCounter);
 
             }
             break;
@@ -452,7 +454,6 @@ void loop()
       }
 
    #endif
-
 }
 
 
@@ -472,13 +473,12 @@ void softwareReset( uint8_t preScaler )
 
 void calculateFtnQueue( int number )
 {
-
    // Now we're going to do some calculations
-   ftn_queue[ number ].inUse = Dcc.getCV(35 + ( number * 5 ));
+   ftn_queue[ number ].inUse = Dcc.getCV(30 + ( number * 5 ));
 
    // Print some values if requested
-   _PP( "cv #: ");
-   _2P( 35 + ( number * 5 ), DEC);
+   _PP( "\t" "cv #: ");
+   _2P( 30 + ( number * 5 ), DEC);
    _PP( "\t" " value: ");
    _2L( ftn_queue[ number ].inUse, DEC);
 
@@ -490,45 +490,45 @@ void calculateFtnQueue( int number )
    ftn_queue[ number ].upDown         = false;
 
    // These values stored in the Configuration Variables
-   uint8_t S_maxLevel = Dcc.getCV( 36 + ( number * 5 ));
-   uint8_t S_highend  = Dcc.getCV( 37 + ( number * 5 ));
-   uint8_t S_divider  = Dcc.getCV( 38 + ( number * 5 ));
-   uint8_t S_interval = Dcc.getCV( 39 + ( number * 5 ));
+   uint8_t S_maxLevel = Dcc.getCV( 31 + ( number * 5 ));
+   uint8_t S_highend  = Dcc.getCV( 32 + ( number * 5 ));
+   uint8_t S_divider  = Dcc.getCV( 33 + ( number * 5 ));
+   uint8_t S_interval = Dcc.getCV( 34 + ( number * 5 ));
 
    if (M_maxLevel > S_maxLevel)
    {
-      ftn_queue[number].maxLevel = S_maxLevel;
+      ftn_queue[ number ].maxLevel = S_maxLevel;
    }
    else
    {
-      ftn_queue[number].maxLevel = M_maxLevel;
+      ftn_queue[ number ].maxLevel = M_maxLevel;
    }
 
    if (M_interval > S_interval)
    {
-      ftn_queue[number].blinkInterval = S_interval * 10;
+      ftn_queue[ number ].blinkInterval = S_interval * 10;
    }
    else
    {
-      ftn_queue[number].blinkInterval = M_interval * 10;
+      ftn_queue[ number ].blinkInterval = M_interval * 10;
    }
 
    if (M_highend > S_highend)
    {
-      ftn_queue[number].waitMicros = ( (S_highend * 100000) / Palatis::SoftPWM.PWMlevels() );
+      ftn_queue[ number ].waitMicros = ( (S_highend * 100000) / Palatis::SoftPWM.PWMlevels() );
    }
    else
    {
-      ftn_queue[number].waitMicros = ( (M_highend * 100000) / Palatis::SoftPWM.PWMlevels() );
+      ftn_queue[ number ].waitMicros = ( (M_highend * 100000) / Palatis::SoftPWM.PWMlevels() );
    }
 
    if (M_divider > S_divider)
    {
-      ftn_queue[number].waitMicros = ( ftn_queue[number].waitMicros / S_divider );
+      ftn_queue[ number ].waitMicros = ( ftn_queue[ number ].waitMicros / S_divider );
    }
    else
    {
-      ftn_queue[number].waitMicros = ( ftn_queue[number].waitMicros / M_divider );
+      ftn_queue[ number ].waitMicros = ( ftn_queue[ number ].waitMicros / M_divider );
    }
 }
 
@@ -536,45 +536,45 @@ void calculateFtnQueue( int number )
 /* ******************************************************************************* */
 
 
-volatile int prevFuncState = 25;  // Previous state of light function.
+// volatile int prevFuncState = 25;  // Previous state of light function.
 
-void exec_function (int function, int FuncState)
-{
-   if ( function == -1 )
-   {
-      if ( prevFuncState != FuncState)
-      {
-         prevFuncState = FuncState; // Something changed state
+// void exec_function (int function, int FuncState)
+// {
+//    // if ( function == -1 )
+//    // {
+//    //    if ( prevFuncState != FuncState)
+//    //    {
+//    //       prevFuncState = FuncState; // Something changed state
 
-         char recData[4] = " 0 ";
-         recData[1] = 48 + FuncState;
+//    //       char recData[4] = " 0 ";
+//    //       recData[1] = 48 + FuncState;
 
-         parseCom( recData );       // Action on CV value
-      }
-   }
-   else
-   {
-      if ( ftn_queue[ function ].inUse != FuncState )
-      {
-         ftn_queue[ function ].inUse = FuncState;
-      }
-   }
+//    //       parseCom( recData );       // Action on CV value
+//    //    }
+//    // }
+//    // else
+//    // {
+//    //    if ( ftn_queue[ function ].inUse != FuncState )
+//    //    {
+//    //       ftn_queue[ function ].inUse = FuncState;
+//    //    }
+//    // }
 
-   // _PP("\t" "function: " );
-   // _2P(function,  DEC);
-   // _PP("\t" "FuncState: ");
-   // _2P(FuncState, DEC);
-   // _PP("\t" "cvValue: "  );
-   // _2P(cvValue,   DEC);
-   // _PP("\t" "prevFuncState: ");
-   // _2L(prevFuncState,     DEC);
-
-
-// F0 alle lichten aan of uit  -->  FuncState 1 of 0  -->  CV 30
-// F1 LS1 aan of uit  -->  FuncState 1 of 0  -->  CV 35  -->  ftn_queue[0]  -->  function
+//    // _PP("\t" "function: " );
+//    // _2P(function,  DEC);
+//    // _PP("\t" "FuncState: ");
+//    // _2P(FuncState, DEC);
+//    // _PP("\t" "cvValue: "  );
+//    // _2P(cvValue,   DEC);
+//    // _PP("\t" "prevFuncState: ");
+//    // _2L(prevFuncState,     DEC);
 
 
-}
+// // F0 alle lichten aan of uit  -->  FuncState 1 of 0  -->  CV 30
+// // F1 LS1 aan of uit  -->  FuncState 1 of 0  -->  CV 35  -->  ftn_queue[0]  -->  function
+
+
+// }
 
 
 /* ******************************************************************************* */
@@ -678,9 +678,9 @@ void parseCom( char *com )
       {
          noInterrupts();   // Disable interrupts.
 
-         for (int i = 0; i < numfpins - 1; i++) 
+         for (int i = 1; i < numfpins; i++) 
          {
-            Dcc.setCV( 35 + ( i * 5 ), 0 );
+            Dcc.setCV( 30 + ( i * 5 ), 0 );
             ftn_queue[i].inUse = 0;
             calculateFtnQueue( i );
          }
@@ -699,9 +699,9 @@ void parseCom( char *com )
       {
          noInterrupts();   // Disable interrupts.
 
-         for (int i = 0; i < numfpins - 1; i++) 
+         for (int i = 1; i < numfpins; i++) 
          {
-            Dcc.setCV( 35 + ( i * 5 ), 1 );
+            Dcc.setCV( 30 + ( i * 5 ), 1 );
             ftn_queue[i].inUse = 1;
             calculateFtnQueue( i );
          }
@@ -720,9 +720,9 @@ void parseCom( char *com )
       {
          noInterrupts();   // Disable interrupts.
 
-         for (int i = 0; i < numfpins - 1; i++) 
+         for (int i = 1; i < numfpins; i++) 
          {
-            Dcc.setCV( 35 + ( i * 5 ), 2 );
+            Dcc.setCV( 30 + ( i * 5 ), 2 );
             ftn_queue[i].inUse = 2;
             calculateFtnQueue( i );
          }
@@ -741,9 +741,9 @@ void parseCom( char *com )
       {
          noInterrupts();   // Disable interrupts.
 
-         for (int i = 0; i < numfpins - 1; i++) 
+         for (int i = 1; i < numfpins; i++) 
          {
-            Dcc.setCV( 35 + ( i * 5 ), 3 );
+            Dcc.setCV( 30 + ( i * 5 ), 3 );
             ftn_queue[i].inUse = 3;
             calculateFtnQueue( i );
          }
@@ -762,9 +762,9 @@ void parseCom( char *com )
       {
          noInterrupts();   // Disable interrupts.
 
-         for (int i = 0; i < numfpins - 1; i++) 
+         for (int i = 1; i < numfpins; i++) 
          {
-            Dcc.setCV( 35 + ( i * 5 ), 4 );
+            Dcc.setCV( 30 + ( i * 5 ), 4 );
             ftn_queue[i].inUse = 4;
             calculateFtnQueue( i );
          }
@@ -783,9 +783,9 @@ void parseCom( char *com )
       {
          noInterrupts();   // Disable interrupts.
 
-         for (int i = 0; i < numfpins - 1; i++) 
+         for (int i = 1; i < numfpins; i++) 
          {
-            Dcc.setCV( 35 + ( i * 5 ), 5 );
+            Dcc.setCV( 30 + ( i * 5 ), 5 );
             ftn_queue[i].inUse = 5;
             calculateFtnQueue( i );
          }
@@ -917,7 +917,7 @@ void parseCom( char *com )
          {
             case  30:
             {
-               char recData[4] = " 1 ";
+               char recData[4] = " 0 ";
                recData[1] = com[6];
 
                parseCom( recData ); //  Recursive action on CV value
@@ -935,7 +935,7 @@ void parseCom( char *com )
                M_interval = Dcc.getCV( 34 ); //     Standard blink interval  (* 10)
 
                // Loop through all the settings for checking, correcting the values
-               for (int i = 0; i < numfpins; i++)
+               for (int i = 1; i < numfpins; i++)
                {
                   calculateFtnQueue( i );
                }
@@ -946,7 +946,7 @@ void parseCom( char *com )
 
             case  35 ... 104:
             {
-               calculateFtnQueue( (cv - 35) / 5 );
+               calculateFtnQueue( (cv - 30) / 5);
 
                _PL( "35 ... 104" );
                break;
@@ -954,7 +954,7 @@ void parseCom( char *com )
 
             case 105 ... 109:
             {
-               calculateFtnQueue( 14 );
+               calculateFtnQueue( 15 );
 
                _PL( "105 ... 109" );
                break;
@@ -1021,18 +1021,9 @@ void parseCom( char *com )
  *  Returns:
  *    None
  */
-void    notifyDccSpeed( uint16_t Addr, DCC_ADDR_TYPE AddrType, uint8_t Speed, DCC_DIRECTION Dir, DCC_SPEED_STEPS SpeedSteps )
-{
-   // _PP("\t" "notifyDccSpeed Addr: ");
-   // _2P(Addr, DEC);
-   // _PP(" " + (AddrType == DCC_ADDR_SHORT) ? 'S' : 'L' );
-   // _PP("\t" "Speed: ");
-   // _2P(Speed, DEC);
-   // _PP("\t" "Dir: ");
-   // _PP(Dir);
-   // _PP("\t" "SpeedSteps: ");
-   // _2L(SpeedSteps, DEC);
-}
+// void    notifyDccSpeed( uint16_t Addr, DCC_ADDR_TYPE AddrType, uint8_t Speed, DCC_DIRECTION Dir, DCC_SPEED_STEPS SpeedSteps )
+// {
+// }
 
 
 /* **********************************************************************************
@@ -1047,8 +1038,6 @@ void    notifyDccSpeed( uint16_t Addr, DCC_ADDR_TYPE AddrType, uint8_t Speed, DC
  */
 // void    notifyDccReset(uint8_t hardReset )
 // {
-//    _PP("\t" "notifyDccReset: ");
-//    _2L(hardReset, DEC);
 // }
 
 
@@ -1072,90 +1061,59 @@ void    notifyDccSpeed( uint16_t Addr, DCC_ADDR_TYPE AddrType, uint8_t Speed, DC
  *  Returns:
  *    None
  */
-void    notifyDccFunc( uint16_t Addr, DCC_ADDR_TYPE AddrType, FN_GROUP FuncGrp, uint8_t FuncState)
+void    notifyDccFunc( uint16_t Addr, DCC_ADDR_TYPE AddrType, FN_GROUP FuncGrp, uint8_t FuncState ) 
 {
-   // _PP( "\t" "notifyDccFunc Addr: " );
-   // _2P( Addr,  DEC );
-   // _PP( (AddrType == DCC_ADDR_SHORT) ? 'S' : 'L' );
-   // _PP( "\t"  " Function Group: " );
-   // _2P( FuncGrp,  DEC );
-   // _PP( "\t"  " State: " );
-   // _2L( FuncState,  DEC );
-
    switch(FuncGrp)
    {
       case FN_0_4:    //Function Group 1 F0 F4 F3 F2 F1
-         exec_function( -1, (FuncState & FN_BIT_00)>>4 );
-         exec_function(  0, (FuncState & FN_BIT_01)    );
-         exec_function(  1, (FuncState & FN_BIT_02)>>1 );
-         exec_function(  2, (FuncState & FN_BIT_03)>>2 );
-         exec_function(  3, (FuncState & FN_BIT_04)>>3 );
-         break;
+         {
+            //n_queue[  0 ].inUse = FuncState & FN_BIT_00 ? 1 : 0;
+            // ftn_queue[  1 ].inUse = FuncState & FN_BIT_01 ? 1 : 0;
+            // ftn_queue[  2 ].inUse = FuncState & FN_BIT_02 ? 1 : 0;
+            // ftn_queue[  3 ].inUse = FuncState & FN_BIT_03 ? 1 : 0;
+            // ftn_queue[  4 ].inUse = FuncState & FN_BIT_04 ? 1 : 0;
 
-      case FN_5_8:    //Function Group 1 S FFFF == 1 F8 F7 F6 F5  &  == 0  F12 F11 F10 F9
-         exec_function(  4, (FuncState & FN_BIT_05)    );
-         exec_function(  5, (FuncState & FN_BIT_06)>>1 );
-         exec_function(  6, (FuncState & FN_BIT_07)>>2 );
-         exec_function(  7, (FuncState & FN_BIT_08)>>3 );
-         break;
+            Dcc.setCV( 30, FuncState & FN_BIT_00 ? 1 : 0 );
+            Dcc.setCV( 35, FuncState & FN_BIT_01 ? 1 : 0 );
+            Dcc.setCV( 40, FuncState & FN_BIT_02 ? 1 : 0 );
+            Dcc.setCV( 45, FuncState & FN_BIT_03 ? 1 : 0 );
+            Dcc.setCV( 50, FuncState & FN_BIT_04 ? 1 : 0 );
+            break;
+         }
 
-      case FN_9_12:
-         exec_function(  8, (FuncState & FN_BIT_09)    );
-         exec_function(  9, (FuncState & FN_BIT_10)>>1 );
-         exec_function( 10, (FuncState & FN_BIT_11)>>2 );
-         exec_function( 11, (FuncState & FN_BIT_12)>>3 );
-         break;
+      case FN_5_8:    //Function Group 1    F8 F7 F6 F5
+         {
+            ftn_queue[  5 ].inUse = FuncState & FN_BIT_05 ? 1 : 0;
+            ftn_queue[  6 ].inUse = FuncState & FN_BIT_06 ? 1 : 0;
+            ftn_queue[  7 ].inUse = FuncState & FN_BIT_07 ? 1 : 0;
+            ftn_queue[  8 ].inUse = FuncState & FN_BIT_08 ? 1 : 0;
+            break;
+         }
 
-      case FN_13_20:   //Function Group 2 FuncState == F20-F13 Function Control
-         exec_function( 12, (FuncState & FN_BIT_13)    );
-         exec_function( 13, (FuncState & FN_BIT_14)>>1 );
-         // c_function( 15, (FuncState & FN_BIT_15)>>2 );
-         // c_function( 16, (FuncState & FN_BIT_16)>>3 );
-         break;
+      case FN_9_12:   //Function Group 1 F12 F11 F10 F9
+         {
+            ftn_queue[  9 ].inUse = FuncState & FN_BIT_09 ? 1 : 0;
+            ftn_queue[ 10 ].inUse = FuncState & FN_BIT_10 ? 1 : 0;
+            ftn_queue[ 11 ].inUse = FuncState & FN_BIT_11 ? 1 : 0;
+            ftn_queue[ 12 ].inUse = FuncState & FN_BIT_12 ? 1 : 0;
+            break;
+         }
+
+      case FN_13_20:  //Function Group 2  ==  F20 - F13
+         {
+            ftn_queue[ 12 ].inUse = FuncState & FN_BIT_13 ? 1 : 0;
+            ftn_queue[ 13 ].inUse = FuncState & FN_BIT_14 ? 1 : 0;
+            //n_queue[ 14 ].inUse = FuncState & FN_BIT_15 ? 1 : 0;
+            //n_queue[ 15 ].inUse = FuncState & FN_BIT_16 ? 1 : 0;
+            break;
+         }
 
       case FN_21_28:
+      {
+         ;
          break;	
+      }
    }
-}
-
-
-/* **********************************************************************************
- *  notifyDccAccBoardAddrSet() Board oriented callback for a turnout accessory decoder.
- *                             This notification is when a new Board Address is set to the
- *                             address of the next DCC Turnout Packet that is received
- *
- *                             This is enabled via the setAccDecDCCAddrNextReceived() method above
- *
- *  Inputs:
- *    BoardAddr   - Per board address. Equivalent to CV 1 LSB & CV 9 MSB.
- *                  per board for a standard accessory decoder with 4 output pairs.
- *
- *  Returns:
- *    None
- */
-void    notifyDccAccBoardAddrSet( uint16_t BoardAddr)
-{
-   _PL("\t" "notifyDccAccBoardAddrSet");
-}
-
-
-/* **********************************************************************************
- *  notifyDccAccOutputAddrSet() Output oriented callback for a turnout accessory decoder.
- *                              This notification is when a new Output Address is set to the
- *                              address of the next DCC Turnout Packet that is received
- *
- *                             This is enabled via the setAccDecDCCAddrNextReceived() method above
- *
- *  Inputs:
- *    Addr        - Per output address. There will be 4 Addr addresses
- *                  per board for a standard accessory decoder with 4 output pairs.
- *
- *  Returns:
- *    None
- */
-void    notifyDccAccOutputAddrSet( uint16_t Addr)
-{
-   _PL("\t" "notifyDccAccOutputAddrSet");
 }
 
 
@@ -1181,6 +1139,8 @@ void notifyCVChange(uint16_t CV, uint8_t Value)
    _2P( CV, DEC    );
    _PP( " Value: " );
    _2L( Value, DEC );
+
+   notifyDccCVChange( CV, Value);
 }
 
 void    notifyDccCVChange( uint16_t CV, uint8_t Value)
@@ -1220,7 +1180,7 @@ void    notifyDccCVChange( uint16_t CV, uint8_t Value)
                M_interval = Dcc.getCV( 34 ); //     Standard blink interval  (* 10)
 
                // Loop through all the settings for checking, correcting the values
-               for (int i = 0; i < numfpins; i++)
+               for (int i = 1; i < numfpins; i++)
                {
                   calculateFtnQueue( i );
                }
@@ -1231,7 +1191,7 @@ void    notifyDccCVChange( uint16_t CV, uint8_t Value)
 
             case  35 ... 104:
             {
-               calculateFtnQueue(( CV - 35 ) / 5 );
+               calculateFtnQueue( ( CV - 30 ) / 5 );
 
                _PL( "35 ... 104" );
                break;
