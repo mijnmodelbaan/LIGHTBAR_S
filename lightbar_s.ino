@@ -1,14 +1,16 @@
 
 /*
    TODO: check for maximum when changing CVs 31 ... 34
-   TODO: check 'notifyDccCVChange' and '<W>' command: they use the same functionality
-   TODO: notifyDccFunc testen / checken / aanpassen
+   TODO: implement change of direction --> forward / backward
 */
 
 
 #include <avr/wdt.h> // Needed for automatic reset functions.
 
-//  The next line is there to prevent large in-rush currents.
+
+/* ******************************************************************************* */
+
+//  The next line is there to prevent large in-rush currents during PWM cycly.
 #define SOFTPWM_OUTPUT_DELAY
 
 #include <SoftPWM.h>
@@ -27,26 +29,15 @@ SOFTPWM_DEFINE_CHANNEL(11, DDRB, PORTB, PORTB0);  //Arduino pin D8 --> AX1
 SOFTPWM_DEFINE_CHANNEL(12, DDRB, PORTB, PORTB1);  //Arduino pin D9 --> AX2
 SOFTPWM_DEFINE_CHANNEL(13, DDRB, PORTB, PORTB2);  //Arduino pin 10 --> AX3
 SOFTPWM_DEFINE_CHANNEL(14, DDRC, PORTC, PORTC2);  //Arduino pin A2 --> AX4
-SOFTPWM_DEFINE_CHANNEL(15, DDRB, PORTB, PORTB5);  //Arduino pin 13 --> LED
+// TPWM_DEFINE_CHANNEL(15, DDRB, PORTB, PORTB5);  //Arduino pin 13 --> LED
 
-SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS( 15, 100);
+SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS( 14, 100);  // Set 15 pulsed outputs
 
 
 /* ******************************************************************************* */
 
 
-extern int __heap_start, *__brkval;
-
-char bomMarker        =   '<';   // Begin of message marker.
-char eomMarker        =   '>';   // End   of message marker.
-char commandString[ 64]      ;   // Max length for a buffer.
-boolean foundBom      = false;   // Found begin of messages.
-boolean foundEom      = false;   // Founf  end  of messages.
-
-
-///////////////////////////////////////**********************************************
-
-// Uncomment to use the PinChangeInterrupts iso External Interrupts
+// ***** Uncomment to use the PinChangeInterrupts iso External Interrupts *****
 // #define PIN_CHANGE_INT
 
 #include <NmraDcc.h>
@@ -54,8 +45,10 @@ boolean foundEom      = false;   // Founf  end  of messages.
 NmraDcc     Dcc ;
 DCC_MSG  Packet ;
 
+
 // ******** UNLESS YOU WANT ALL CV'S RESET UPON EVERY POWER UP REMOVE THE "//" IN THE FOLLOWING LINE!!
 #define DECODER_LOADED
+
 
 // ******** REMOVE THE "//" IN THE FOLLOWING LINE TO SEND DEBUGGING INFO TO THE SERIAL MONITOR
 #define _DEBUG_
@@ -71,6 +64,7 @@ DCC_MSG  Packet ;
    #define _2P(a,b)
    #define _2L(a,b)
 #endif
+
 
 // ******** REMOVE THE "//" IN THE NEXT LINE IF YOU WANT TO USE YOUR SERIAL PORT FOR COMMANDS
 #define _MONITOR_
@@ -91,8 +85,20 @@ DCC_MSG  Packet ;
 /* ******************************************************************************* */
 
 
+extern int __heap_start, *__brkval;
+
+char bomMarker        =   '<';   // Begin of message marker.
+char eomMarker        =   '>';   // End   of message marker.
+char commandString[ 64]      ;   // Max length for a buffer.
+boolean foundBom      = false;   // Found begin of messages.
+boolean foundEom      = false;   // Founf  end  of messages.
+
+
+/* ******************************************************************************* */
+
+
 int tim_delay =  500;
-int numfpins  =   16;
+int numfpins  =   17;
 byte fpins [] = { 11,   7,  15,   5,   3,   6,  14,   4,  17,  18,  19,   8,   9,  10,  16,  13,  12};
 //  pinnames:  > DNU, PD7, PC1, PD5, PD3, PD6, PC0, PD4, PC3, PC4, PC5, PB0, PB1, PB2, PC2, PB5, DNU <
 
@@ -132,7 +138,7 @@ const int FunctionPin15  = 19;  // PC5  LB6
 
 
 #define SET_CV_Address       24  // THIS ADDRESS IS FOR SETTING CV'S  (LIKE A LOCO)
-#define Accessory_Address    40  // THIS ADDRESS IS THE START OF THE SOUTPUTS RANGE
+#define Accessory_Address    40  // THIS ADDRESS IS THE ADDRESS OF THIS DCC DECODER
 
 uint8_t CV_DECODER_MASTER_RESET  = 120; // THIS IS THE CV ADDRESS OF THE FULL RESET
 #define CV_To_Store_SET_CV_Address 121
@@ -169,9 +175,9 @@ CVPair FactoryDefaultCVs [] =
 
 //  Speed Steps don't matter for this decoder, only for loc decoders
 //  ONLY uncomment 1 CV_29_CONFIG line below as approprate DEFAULT IS SHORT ADDRESS
-// {CV_29_CONFIG,          0},                                                                                 // Short Address 14 Speed Steps
+// {CV_29_CONFIG,                0},                                                                           // Short Address 14 Speed Steps
    {CV_29_CONFIG, CV29_F0_LOCATION},                                                                           // Short Address 28/128 Speed Steps
-// {CV_29_CONFIG, CV29_EXT_ADDRESSING | CV29_F0_LOCATION},                                                     // Long  Address 28/128 Speed Steps
+// {CV_29_CONFIG, CV29_EXT_ADDRESSING    | CV29_F0_LOCATION},                                                  // Long  Address 28/128 Speed Steps
 // {CV_29_CONFIG, CV29_ACCESSORY_DECODER | CV29_OUTPUT_ADDRESS_MODE | CV29_F0_LOCATION},                       // Accesory Decoder Short Address
 // {CV_29_CONFIG, CV29_ACCESSORY_DECODER | CV29_OUTPUT_ADDRESS_MODE | CV29_EXT_ADDRESSING | CV29_F0_LOCATION}, // Accesory Decoder  Long Address
 
@@ -261,19 +267,22 @@ CVPair FactoryDefaultCVs [] =
    {108,   5}, //     Waitmicros output divider
    {109, 100}, //     Blinkinterval this output
    {110,   0}, // DNU 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
-   {111,  50}, //     Maximum level this output
-   {112, 100}, //     Waitmicros output highend
-   {113,   5}, //     Waitmicros output divider
-   {114, 100}, //     Blinkinterval this output
+   {111,   0}, //     Maximum level this output
+   {112,   0}, //     Waitmicros output highend
+   {113,   0}, //     Waitmicros output divider
+   {114,   0}, //     Blinkinterval this output
 };
 
-volatile uint8_t FactoryDefaultCVIndex = sizeof(FactoryDefaultCVs) / sizeof(CVPair);
+volatile uint8_t FactoryDefaultCVIndex = sizeof( FactoryDefaultCVs ) / sizeof( CVPair );
 
 // These are the absolute maximums allowed !!!
 volatile uint8_t M_maxLevel = Dcc.getCV( 31 );
 volatile uint8_t M_highend  = Dcc.getCV( 32 );
 volatile uint8_t M_divider  = Dcc.getCV( 33 );
 volatile uint8_t M_interval = Dcc.getCV( 34 );
+
+// This is the switch between F0  or  F1 - F14
+volatile uint8_t C_between  = Dcc.getCV(111 );
 
 
 /* ******************************************************************************* */
@@ -284,14 +293,14 @@ void setup()
    noInterrupts();
 
    // initialize the digital pins as outputs
-   for (int i = 1; i <= numfpins; i++) 
+   for (int i = 1; i < numfpins - 1; i++) 
    {
-      digitalWrite(fpins[i], 0);  // Switch the pin off first.
-      pinMode(fpins[i], OUTPUT);  // Then set it as an output.
+      digitalWrite( fpins[ i ], 0 );  // Switch the pin off first.
+      pinMode( fpins[ i ], OUTPUT );  // Then set it as an output.
    }
 
-   // Start SoftPWM with 50hz pwm frequency
-   Palatis::SoftPWM.begin( 50);
+   // Start SoftPWM with 60hz pwm frequency
+   Palatis::SoftPWM.begin( 60);
 
    #if defined(_DEBUG_) || defined(_MONITOR_)
 
@@ -316,10 +325,9 @@ void setup()
 
    #endif
 
-   Dcc.pin(digitalPinToInterrupt(FunctionPinDcc), FunctionPinDcc, false);
+   Dcc.pin( digitalPinToInterrupt( FunctionPinDcc ), FunctionPinDcc, false );
 
-   // Dcc.init(MAN_ID_DIY, 201, FLAGS_OUTPUT_ADDRESS_MODE | FLAGS_DCC_ACCESSORY_DECODER, CV_To_Store_SET_CV_Address);
-   Dcc.init(MAN_ID_DIY, 201, FLAGS_MY_ADDRESS_ONLY, CV_To_Store_SET_CV_Address);
+   Dcc.init( MAN_ID_DIY, 201, FLAGS_MY_ADDRESS_ONLY, CV_To_Store_SET_CV_Address );
 
    #if defined(DECODER_LOADED)
 
@@ -327,13 +335,15 @@ void setup()
       {
       #endif
 
+         FactoryDefaultCVIndex =  sizeof( FactoryDefaultCVs ) / sizeof( CVPair );
+
          for (int i = 0; i < FactoryDefaultCVIndex; i++)
          {
-            Dcc.setCV(FactoryDefaultCVs[ i ].CV, FactoryDefaultCVs[ i ].Value);
+            Dcc.setCV( FactoryDefaultCVs[ i ].CV, FactoryDefaultCVs[ i ].Value );
 
-            digitalWrite(FunctionPinLed, 1);
-            delay (tim_delay);
-            digitalWrite(FunctionPinLed, 0);
+            digitalWrite( FunctionPinLed, 1 );
+            delay ( tim_delay );
+            digitalWrite( FunctionPinLed, 0 );
          }
 
       #if defined(DECODER_LOADED)
@@ -346,21 +356,18 @@ void setup()
    M_divider  = Dcc.getCV( 33 ); //     Waitmicros divider (standard 5)
    M_interval = Dcc.getCV( 34 ); //     Standard blink interval  (* 10)
 
+   // This is the switch between F0  or  F1 - F14
+   C_between  = Dcc.getCV(111 );
+
    // Loop through all the settings for checking and correcting
-   for (int i = 1; i < numfpins; i++)
+   for (int i = 1; i < numfpins - 1; i++)
    {
       calculateFtnQueue( i );
    }
 
-   _PL(""); // An extra empty line for clearness
-   _PL("*************************************");
-
    #ifdef _MONITOR_
-      displayText(); // Shows the standard explanation text
+      displayText(); // Shows the standard text.
    #endif
-
-   _PL("*************************************");
-   _PL(""); // An extra empty line for clearness
 
    // Switch on the LED to signal we're ready.
    digitalWrite(FunctionPinLed, 0);
@@ -383,15 +390,15 @@ void loop()
    unsigned long currentMillis = millis();
    unsigned long currentMicros = micros();
 
-   Dcc.process();
+   Dcc.process(); // Loop through the DCC process.
 
-   for (int i = 1; i < numfpins-1; i++)
+   for (int i = 1; i < numfpins - 2; i++)
    {
       switch ( ftn_queue[ i ].inUse )
       {
          case 1:     // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
          {
-            Palatis::SoftPWM.set( i, ftn_queue[ i ].maxLevel);
+            Palatis::SoftPWM.set( i, ftn_queue[ i ].maxLevel );
             break;
          }
 
@@ -431,7 +438,6 @@ void loop()
                if (ftn_queue[ i ].upDown == true) { ftn_queue[ i ].fadeCounter++; } else { ftn_queue[ i ].fadeCounter--; }
 
                Palatis::SoftPWM.set( i, ftn_queue[ i ].fadeCounter);
-
             }
             break;
          }
@@ -450,7 +456,7 @@ void loop()
       {
          foundBom = false;
          foundEom = false;
-         parseCom(commandString);
+         parseCom( commandString );
       }
 
    #endif
@@ -471,15 +477,105 @@ void softwareReset( uint8_t preScaler )
 /* ******************************************************************************* */
 
 
+/* *** 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On *** */
+void setAllOutputCVs( int cvvalue )
+{
+   noInterrupts();   // Disable interrupts.
+
+   for (int i = 1; i < numfpins - 2; i++) 
+   {
+      Dcc.setCV( 30 + ( i * 5 ), cvvalue );
+      ftn_queue[ i ].inUse = cvvalue;
+   }
+
+   interrupts();  // Enable the interrupts.
+
+   // Send feedback if requested.
+   _MP( "\t" "<" );
+   _3P( cvvalue, DEC );
+   _ML( ">" );
+}
+
+
+/* ******************************************************************************* */
+
+
+void setCVvalues( int cvNumber, int cvValue )
+{
+
+   _PP( "setCVvalues: ");
+   _2P( cvNumber,   DEC);
+   _PP( "   Value: "   );
+   _2L( cvValue,    DEC);
+
+   switch ( cvNumber )
+   {
+      case  30:
+      {
+         char recData[ 4 ] = " 0 ";
+
+         recData[ 1 ] = 48 + cvValue;  // Make it an ASCII code
+         parseCom( recData ); //   Recursive action on CV value
+
+         break;
+      }
+
+      case  31 ...  34:
+      {
+         // These are the absolute maximums allowed
+         M_maxLevel = Dcc.getCV( 31 ); //     Maximum level outputs (100 max)
+         M_highend  = Dcc.getCV( 32 ); //     Waitmicros  (250 * 100,000 max)
+         M_divider  = Dcc.getCV( 33 ); //     Waitmicros divider (standard 5)
+         M_interval = Dcc.getCV( 34 ); //     Standard blink interval  (* 10)
+
+         // Loop through all the settings for checking, correcting the values
+         for (int i = 1; i < numfpins - 1; i++)
+         {
+            calculateFtnQueue( i );
+         }
+         break;
+      }
+
+      case  35 ... 104:
+      {
+         calculateFtnQueue( ( cvNumber - 30 ) / 5 );   // Group of 5 values
+
+         break;
+      }
+
+      case 105 ... 109:
+      {
+         break;
+      }
+
+      case 110 ... 114:
+      {
+         // This is the switch between F0  or  F1 - F14
+         C_between  = Dcc.getCV( 111 );
+
+         break;
+      }
+
+      default:
+      {
+         break;
+      }
+   }
+}
+
+
+/* ******************************************************************************* */
+
+
 void calculateFtnQueue( int number )
 {
    // Now we're going to do some calculations
-   ftn_queue[ number ].inUse = Dcc.getCV(30 + ( number * 5 ));
+   ftn_queue[ number ].inUse = Dcc.getCV( 30 + ( number * 5 ) );
 
-   // Print some values if requested
-   _PP( "\t" "cv #: ");
-   _2P( 30 + ( number * 5 ), DEC);
-   _PP( "\t" " value: ");
+   // Print some values  -  if requested
+   _PP( "\t" "calculateFtnQueue  cv: ");
+   _2P( 30 + ( number * 5 ),       DEC);
+   _PP( "\t"                " value: ");
    _2L( ftn_queue[ number ].inUse, DEC);
 
    // Default settings for counters and states
@@ -534,50 +630,6 @@ void calculateFtnQueue( int number )
 
 
 /* ******************************************************************************* */
-
-
-// volatile int prevFuncState = 25;  // Previous state of light function.
-
-// void exec_function (int function, int FuncState)
-// {
-//    // if ( function == -1 )
-//    // {
-//    //    if ( prevFuncState != FuncState)
-//    //    {
-//    //       prevFuncState = FuncState; // Something changed state
-
-//    //       char recData[4] = " 0 ";
-//    //       recData[1] = 48 + FuncState;
-
-//    //       parseCom( recData );       // Action on CV value
-//    //    }
-//    // }
-//    // else
-//    // {
-//    //    if ( ftn_queue[ function ].inUse != FuncState )
-//    //    {
-//    //       ftn_queue[ function ].inUse = FuncState;
-//    //    }
-//    // }
-
-//    // _PP("\t" "function: " );
-//    // _2P(function,  DEC);
-//    // _PP("\t" "FuncState: ");
-//    // _2P(FuncState, DEC);
-//    // _PP("\t" "cvValue: "  );
-//    // _2P(cvValue,   DEC);
-//    // _PP("\t" "prevFuncState: ");
-//    // _2L(prevFuncState,     DEC);
-
-
-// // F0 alle lichten aan of uit  -->  FuncState 1 of 0  -->  CV 30
-// // F1 LS1 aan of uit  -->  FuncState 1 of 0  -->  CV 35  -->  ftn_queue[0]  -->  function
-
-
-// }
-
-
-/* ******************************************************************************* */
 // The next part will / can only be used for an mpu with enough memory
 
 #ifdef _MONITOR_
@@ -609,27 +661,28 @@ void displayText()
 {
    Serial.println(""); // An extra empty line for clearness
    Serial.println(F("Put in one of the following commands: "                        ));
-   Serial.println(F("--------------------------------------------------------------"));
-   Serial.println(F("<0>   all outputs: Off"                                        ));
-   Serial.println(F("<1>   all outputs:  On"                                        ));
-   Serial.println(F("<2>   all outputs: Blink Off"                                  ));
-   Serial.println(F("<3>   all outputs: Blink  On"                                  ));
-   Serial.println(F("<4>   all outputs: Fade Off"                                   ));
-   Serial.println(F("<5>   all outputs: Fade  On"                                   ));
+   Serial.println(F("------------------------------------------------"));
+   Serial.println(F("<0>   all outputs: Power Off"                    ));
+   Serial.println(F("<1>   all outputs: Power  On"                    ));
+   Serial.println(F("<2>   all outputs: Blink Off"                    ));
+   Serial.println(F("<3>   all outputs: Blink  On"                    ));
+   Serial.println(F("<4>   all outputs: Fader Off"                    ));
+   Serial.println(F("<5>   all outputs: Fader  On"                    ));
    Serial.println("");
-   Serial.println(F("<C>   clear everything: Factory Default"                       ));
-   Serial.println(F("<D>   dumps everything: to your monitor"                       ));
-   //rial.println("");
-   //rial.println(F("<f>   controls mobile engine decoder functions F0-F12: <f x y>"));
-   //rial.println(F("<F>   lists all funtions and settings for all outputs: <F>"  )  );
+   Serial.println(F("<C>   clear everything: Factory Default"         ));
+   Serial.println(F("<D>   prints CV values: to your monitor"         ));
    Serial.println("");
-   Serial.println(F("<M>   list the available SRAM on the chip"                     ));
+   Serial.println(F("<f>   controls decoder functions F0-F14: <f x y>"));
+   Serial.println(F("<F>   dump the functionqueue and settings: <F>"  ));
    Serial.println("");
-   Serial.println(F("<R>   reads a configuration variable: <R x>"                   ));
-   Serial.println(F("<W>   write a configuration variable: <W x y>"                 ));
-   Serial.println(F("--------------------------------------------------------------"));
-   Serial.println(F("Include < and > in your command   -and-   spaces are mandatory"));
+   Serial.println(F("<M>   list the available SRAM on the chip"       ));
    Serial.println("");
+   Serial.println(F("<R>   reads a configuration variable: <R x>"     ));
+   Serial.println(F("<W>   write a configuration variable: <W x y>"   ));
+   Serial.println(F("------------------------------------------------"));
+   Serial.println(F("* include '<', '>' and spaces in your command * "));
+   // Serial.println(F("Include < and > in your command   -and-   spaces are mandatory"));
+   Serial.println(""); // An extra empty line for clearness
 }
 
 
@@ -644,15 +697,19 @@ void serialEvent() {
    {
       char inChar = (char)Serial.read(); // get the new byte
 
-      if (inChar == bomMarker) {         // start of new command
+      if (inChar == bomMarker)       // start of new command
+      {
          sprintf(commandString, " ");
          foundBom = true;
       }
-      else if (inChar == eomMarker) {    // end of new command
+      else if (inChar == eomMarker)    // end of new command
+      {
+      // sprintf(commandString, " ");
          foundEom = true;
          // parse(commandString) in the loop
       }
-      else if (strlen(commandString) < 128) {
+      else if (strlen(commandString) <  64) // put it all in
+      {
          sprintf(commandString, "%s%c", commandString,  inChar);
          // if comandString still has space, append character just read from serial line
          // otherwise, character is ignored, (but we'll continue to look for '<' or '>')
@@ -676,18 +733,7 @@ void parseCom( char *com )
  *    returns: <0>
  */
       {
-         noInterrupts();   // Disable interrupts.
-
-         for (int i = 1; i < numfpins; i++) 
-         {
-            Dcc.setCV( 30 + ( i * 5 ), 0 );
-            ftn_queue[i].inUse = 0;
-            calculateFtnQueue( i );
-         }
-
-         // Send feedback and restore interrupts.
-         _ML( "\t" "<0>" );
-         interrupts();
+         setAllOutputCVs( 0 );
          break;
       }
 
@@ -697,18 +743,7 @@ void parseCom( char *com )
  *    returns: <1>
  */
       {
-         noInterrupts();   // Disable interrupts.
-
-         for (int i = 1; i < numfpins; i++) 
-         {
-            Dcc.setCV( 30 + ( i * 5 ), 1 );
-            ftn_queue[i].inUse = 1;
-            calculateFtnQueue( i );
-         }
-
-         // Send feedback and restore interrupts.
-         _ML( "\t" "<1>" );
-         interrupts();
+         setAllOutputCVs( 1 );
          break;
       }
 
@@ -718,18 +753,7 @@ void parseCom( char *com )
  *    returns: <2>
  */
       {
-         noInterrupts();   // Disable interrupts.
-
-         for (int i = 1; i < numfpins; i++) 
-         {
-            Dcc.setCV( 30 + ( i * 5 ), 2 );
-            ftn_queue[i].inUse = 2;
-            calculateFtnQueue( i );
-         }
-
-         // Send feedback and restore interrupts.
-         _ML( "\t" "<2>" );
-         interrupts();
+         setAllOutputCVs( 2 );
          break;
       }
 
@@ -739,18 +763,7 @@ void parseCom( char *com )
  *    returns: <3>
  */
       {
-         noInterrupts();   // Disable interrupts.
-
-         for (int i = 1; i < numfpins; i++) 
-         {
-            Dcc.setCV( 30 + ( i * 5 ), 3 );
-            ftn_queue[i].inUse = 3;
-            calculateFtnQueue( i );
-         }
-
-         // Send feedback and restore interrupts.
-         _ML( "\t" "<3>" );
-         interrupts();
+         setAllOutputCVs( 3 );
          break;
       }
 
@@ -760,18 +773,7 @@ void parseCom( char *com )
  *    returns: <4>
  */
       {
-         noInterrupts();   // Disable interrupts.
-
-         for (int i = 1; i < numfpins; i++) 
-         {
-            Dcc.setCV( 30 + ( i * 5 ), 4 );
-            ftn_queue[i].inUse = 4;
-            calculateFtnQueue( i );
-         }
-
-         // Send feedback and restore interrupts.
-         _ML( "\t" "<4>" );
-         interrupts();
+         setAllOutputCVs( 4 );
          break;
       }
 
@@ -781,18 +783,7 @@ void parseCom( char *com )
  *    returns: <5>
  */
       {
-         noInterrupts();   // Disable interrupts.
-
-         for (int i = 1; i < numfpins; i++) 
-         {
-            Dcc.setCV( 30 + ( i * 5 ), 5 );
-            ftn_queue[i].inUse = 5;
-            calculateFtnQueue( i );
-         }
-
-         // Send feedback and restore interrupts.
-         _ML( "\t" "<5>" );
-         interrupts();
+         setAllOutputCVs( 5 );
          break;
       }
 
@@ -826,11 +817,61 @@ void parseCom( char *com )
  *    where VALUE is a number from 0-255 as read from the CV, or -1 if read could not be verified
  */
       {
-         FactoryDefaultCVIndex = sizeof(FactoryDefaultCVs) / sizeof(CVPair);
+         FactoryDefaultCVIndex = sizeof( FactoryDefaultCVs ) / sizeof( CVPair );
 
          for (int i = 0; i < FactoryDefaultCVIndex; i++)
          {
-            uint8_t cvValue = Dcc.getCV( FactoryDefaultCVs[i].CV );
+            uint8_t cvValue = Dcc.getCV( FactoryDefaultCVs[ i ].CV );
+
+            _MP( " cv: "                      );
+            _3P( FactoryDefaultCVs[i].CV, DEC );
+            _MP( "\t"              " value: " );
+            _3L( cvValue, DEC                 );
+         }
+         break;
+      }
+
+
+/***** DUMPS CONFIGURATION VARIABLES FROM DECODER ****/
+
+      case 'F':     // <F>
+/*
+ *    dumps all Configuration Variables from the decoder
+ *
+ *    returns a list of: <CV VALUE)
+ *    where VALUE is a number from 0-255 as read from the CV, or -1 if read could not be verified
+ */
+      {
+         FactoryDefaultCVIndex = sizeof( FactoryDefaultCVs ) / sizeof( CVPair );
+
+         for (int i = 0; i < FactoryDefaultCVIndex; i++)
+         {
+            uint8_t cvValue = Dcc.getCV( FactoryDefaultCVs[ i ].CV );
+
+            _MP( " cv: "                      );
+            _3P( FactoryDefaultCVs[i].CV, DEC );
+            _MP( "\t"              " value: " );
+            _3L( cvValue, DEC                 );
+         }
+         break;
+      }
+
+
+/***** DUMPS CONFIGURATION VARIABLES FROM DECODER ****/
+
+      case 'f':     // <f>
+/*
+ *    dumps all Configuration Variables from the decoder
+ *
+ *    returns a list of: <CV VALUE)
+ *    where VALUE is a number from 0-255 as read from the CV, or -1 if read could not be verified
+ */
+      {
+         FactoryDefaultCVIndex = sizeof( FactoryDefaultCVs ) / sizeof( CVPair );
+
+         for (int i = 0; i < FactoryDefaultCVIndex; i++)
+         {
+            uint8_t cvValue = Dcc.getCV( FactoryDefaultCVs[ i ].CV );
 
             _MP( " cv: "                      );
             _3P( FactoryDefaultCVs[i].CV, DEC );
@@ -884,6 +925,7 @@ void parseCom( char *com )
          _MP( " "   );
          _3P( cvCheck, DEC );
          _ML( ">"   );
+
          break;
       }
 
@@ -913,59 +955,7 @@ void parseCom( char *com )
          _3P( cvCheck, DEC );
          _ML( ">"   );
 
-         switch ( cv )
-         {
-            case  30:
-            {
-               char recData[4] = " 0 ";
-               recData[1] = com[6];
-
-               parseCom( recData ); //  Recursive action on CV value
-
-               _PL( "30" );
-               break;
-            }
-
-            case  31 ...  34:
-            {
-               // These are the absolute maximums allowed
-               M_maxLevel = Dcc.getCV( 31 ); //     Maximum level outputs (100 max)
-               M_highend  = Dcc.getCV( 32 ); //     Waitmicros  (250 * 100,000 max)
-               M_divider  = Dcc.getCV( 33 ); //     Waitmicros divider (standard 5)
-               M_interval = Dcc.getCV( 34 ); //     Standard blink interval  (* 10)
-
-               // Loop through all the settings for checking, correcting the values
-               for (int i = 1; i < numfpins; i++)
-               {
-                  calculateFtnQueue( i );
-               }
-
-               _PL( "31 ... 34" );
-               break;
-            }
-
-            case  35 ... 104:
-            {
-               calculateFtnQueue( (cv - 30) / 5);
-
-               _PL( "35 ... 104" );
-               break;
-            }
-
-            case 105 ... 109:
-            {
-               calculateFtnQueue( 15 );
-
-               _PL( "105 ... 109" );
-               break;
-            }
-
-            default:
-            {
-               _PL( "default" );
-               break;
-            }
-         }
+         break;
       }
 
 
@@ -975,10 +965,15 @@ void parseCom( char *com )
 /*
  *    simply prints a carriage return - useful when interacting with Ardiuno through serial monitor window
  *
- *    returns: a carriage return
+ *    returns: a carriage return and the menu text
  */
       {
          _ML("");
+
+         #ifdef _MONITOR_
+            displayText(); // Shows the standard explanation text
+         #endif
+
          break;
       }
 
@@ -1003,6 +998,9 @@ void parseCom( char *com )
 #endif
 
 
+//  Some functions below are left, which might be needed in some future expansions.
+
+
 /* **********************************************************************************
  *  notifyDccSpeed() Callback for a multifunction decoder speed command.
  *                   The received speed and direction are unpacked to separate values.
@@ -1020,11 +1018,12 @@ void parseCom( char *com )
  *
  *  Returns:
  *    None
- */
-// void    notifyDccSpeed( uint16_t Addr, DCC_ADDR_TYPE AddrType, uint8_t Speed, DCC_DIRECTION Dir, DCC_SPEED_STEPS SpeedSteps )
-// {
-// }
-
+ */   /*
+void    notifyDccSpeed( uint16_t Addr, DCC_ADDR_TYPE AddrType, uint8_t Speed, DCC_DIRECTION Dir, DCC_SPEED_STEPS SpeedSteps )
+{
+   _PL("notifyDccSpeed");
+}
+   */
 
 /* **********************************************************************************
  *  notifyDccReset(uint8_t hardReset) Callback for a DCC reset command.
@@ -1035,11 +1034,12 @@ void parseCom( char *com )
  *
  *  Returns:
  *    None
- */
-// void    notifyDccReset(uint8_t hardReset )
-// {
-// }
-
+ */   /*
+void    notifyDccReset(uint8_t hardReset )
+{
+   _PL( "notifyDccReset" );
+}
+   */
 
 /* **********************************************************************************
  *    notifyDccFunc() Callback for a multifunction decoder function command.
@@ -1063,17 +1063,23 @@ void parseCom( char *com )
  */
 void    notifyDccFunc( uint16_t Addr, DCC_ADDR_TYPE AddrType, FN_GROUP FuncGrp, uint8_t FuncState ) 
 {
-   switch(FuncGrp)
-   {
-      case FN_0_4:    //Function Group 1 F0 F4 F3 F2 F1
-         {
-            //n_queue[  0 ].inUse = FuncState & FN_BIT_00 ? 1 : 0;
-            // ftn_queue[  1 ].inUse = FuncState & FN_BIT_01 ? 1 : 0;
-            // ftn_queue[  2 ].inUse = FuncState & FN_BIT_02 ? 1 : 0;
-            // ftn_queue[  3 ].inUse = FuncState & FN_BIT_03 ? 1 : 0;
-            // ftn_queue[  4 ].inUse = FuncState & FN_BIT_04 ? 1 : 0;
+   static bool B_between = ( FuncState & FN_BIT_00 ? true : false ); // Keeps track of F0 function.
 
-            Dcc.setCV( 30, FuncState & FN_BIT_00 ? 1 : 0 );
+   if ( C_between == 0 )   //  Use the F0 function to switch lights.
+   {
+      if ( B_between != ( FuncState & FN_BIT_00 ? true : false ) && ( FuncGrp == FN_0_4 ) )
+      {
+         B_between = ( FuncState & FN_BIT_00 ? true : false );
+
+         Dcc.setCV( 30, FuncState & FN_BIT_00 ? 1 : 0 );
+      }
+   }
+   else
+   {
+      switch(FuncGrp)
+      {
+         case FN_0_4:    //Function Group 1 F0 F4 F3 F2 F1
+         {
             Dcc.setCV( 35, FuncState & FN_BIT_01 ? 1 : 0 );
             Dcc.setCV( 40, FuncState & FN_BIT_02 ? 1 : 0 );
             Dcc.setCV( 45, FuncState & FN_BIT_03 ? 1 : 0 );
@@ -1081,37 +1087,35 @@ void    notifyDccFunc( uint16_t Addr, DCC_ADDR_TYPE AddrType, FN_GROUP FuncGrp, 
             break;
          }
 
-      case FN_5_8:    //Function Group 1    F8 F7 F6 F5
+         case FN_5_8:    //Function Group 1    F8 F7 F6 F5
          {
-            ftn_queue[  5 ].inUse = FuncState & FN_BIT_05 ? 1 : 0;
-            ftn_queue[  6 ].inUse = FuncState & FN_BIT_06 ? 1 : 0;
-            ftn_queue[  7 ].inUse = FuncState & FN_BIT_07 ? 1 : 0;
-            ftn_queue[  8 ].inUse = FuncState & FN_BIT_08 ? 1 : 0;
+            Dcc.setCV( 55, FuncState & FN_BIT_05 ? 1 : 0 );
+            Dcc.setCV( 60, FuncState & FN_BIT_06 ? 1 : 0 );
+            Dcc.setCV( 65, FuncState & FN_BIT_07 ? 1 : 0 );
+            Dcc.setCV( 70, FuncState & FN_BIT_08 ? 1 : 0 );
             break;
          }
 
-      case FN_9_12:   //Function Group 1 F12 F11 F10 F9
+         case FN_9_12:   //Function Group 1 F12 F11 F10 F9
          {
-            ftn_queue[  9 ].inUse = FuncState & FN_BIT_09 ? 1 : 0;
-            ftn_queue[ 10 ].inUse = FuncState & FN_BIT_10 ? 1 : 0;
-            ftn_queue[ 11 ].inUse = FuncState & FN_BIT_11 ? 1 : 0;
-            ftn_queue[ 12 ].inUse = FuncState & FN_BIT_12 ? 1 : 0;
+            Dcc.setCV( 75, FuncState & FN_BIT_09 ? 1 : 0 );
+            Dcc.setCV( 80, FuncState & FN_BIT_10 ? 1 : 0 );
+            Dcc.setCV( 85, FuncState & FN_BIT_11 ? 1 : 0 );
+            Dcc.setCV( 90, FuncState & FN_BIT_12 ? 1 : 0 );
             break;
          }
 
-      case FN_13_20:  //Function Group 2  ==  F20 - F13
+         case FN_13_20:  //Function Group 2  ==  F20 - F13
          {
-            ftn_queue[ 12 ].inUse = FuncState & FN_BIT_13 ? 1 : 0;
-            ftn_queue[ 13 ].inUse = FuncState & FN_BIT_14 ? 1 : 0;
-            //n_queue[ 14 ].inUse = FuncState & FN_BIT_15 ? 1 : 0;
-            //n_queue[ 15 ].inUse = FuncState & FN_BIT_16 ? 1 : 0;
+            Dcc.setCV( 95, FuncState & FN_BIT_13 ? 1 : 0 );
+            Dcc.setCV(100, FuncState & FN_BIT_14 ? 1 : 0 );
             break;
          }
 
-      case FN_21_28:
-      {
-         ;
-         break;	
+         case FN_21_28:
+         {
+            break;
+         }
       }
    }
 }
@@ -1135,83 +1139,22 @@ void    notifyDccFunc( uint16_t Addr, DCC_ADDR_TYPE AddrType, FN_GROUP FuncGrp, 
  */
 void notifyCVChange(uint16_t CV, uint8_t Value)
 {
-   _PP( "\t" "notifyCVChange: CV: ");
+   _PP( " notifyCVChange: CV: ");
    _2P( CV, DEC    );
    _PP( " Value: " );
    _2L( Value, DEC );
 
-   notifyDccCVChange( CV, Value);
+   setCVvalues( CV, Value );
 }
 
 void    notifyDccCVChange( uint16_t CV, uint8_t Value)
 {
-   _PP( "\t" "notifyDccCVChange: CV: ");
+   _PP( " notifyDccCVChange: CV: ");
    _2P( CV,     DEC);
    _PP( " Value: " );
    _2L( Value,  DEC);
 
-
-//  THIS PART is almost the same as in the 'W' command....
-
-         switch ( CV )
-         {
-            case  30:
-            {
-               char recData[4] = " 0 ";
-
-               if (Value == 1) {recData[1] = 49;}
-               if (Value == 2) {recData[1] = 50;}
-               if (Value == 3) {recData[1] = 51;}
-               if (Value == 4) {recData[1] = 52;}
-               if (Value == 5) {recData[1] = 53;}
-
-               parseCom( recData ); //  Recursive action on CV value
-
-               _PL( "30" );
-               break;
-            }
-
-            case  31 ...  34:
-            {
-               // These are the absolute maximums allowed
-               M_maxLevel = Dcc.getCV( 31 ); //     Maximum level outputs (100 max)
-               M_highend  = Dcc.getCV( 32 ); //     Waitmicros  (250 * 100,000 max)
-               M_divider  = Dcc.getCV( 33 ); //     Waitmicros divider (standard 5)
-               M_interval = Dcc.getCV( 34 ); //     Standard blink interval  (* 10)
-
-               // Loop through all the settings for checking, correcting the values
-               for (int i = 1; i < numfpins; i++)
-               {
-                  calculateFtnQueue( i );
-               }
-
-               _PL( "31 ... 34" );
-               break;
-            }
-
-            case  35 ... 104:
-            {
-               calculateFtnQueue( ( CV - 30 ) / 5 );
-
-               _PL( "35 ... 104" );
-               break;
-            }
-
-            case 105 ... 109:
-            {
-               calculateFtnQueue( 14 );
-
-               _PL( "105 ... 109" );
-               break;
-            }
-
-            default:
-            {
-               _PL( "default" );
-               break;
-            }
-         }
-
+   setCVvalues( CV, Value);
 }
 
 
@@ -1234,7 +1177,7 @@ void notifyCVResetFactoryDefault()
 {
    // Make 'FactoryDefaultCVIndex' non-zero and equal to num CVs to be reset 
    // to flag to the loop() function that a reset to FacDef needs to be done.
-   FactoryDefaultCVIndex = sizeof(FactoryDefaultCVs) / sizeof(CVPair);
+   FactoryDefaultCVIndex = sizeof( FactoryDefaultCVs ) / sizeof( CVPair );
 }
 
 
@@ -1242,4 +1185,4 @@ void notifyCVResetFactoryDefault()
 }
 #endif
 
-//   
+//
