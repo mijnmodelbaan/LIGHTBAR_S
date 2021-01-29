@@ -72,7 +72,7 @@ DCC_MSG  Packet ;
 #ifdef _MONITOR_
    #define _MP( a ) Serial.print(    a );
    #define _ML( a ) Serial.println(  a );
-   #define _3P(a,b) Serial.print( a, b );
+   #define _3P(a,b) Serial.print(  a, b);
    #define _3L(a,b) Serial.println(a, b);
 #else
    #define _MP( a )
@@ -155,6 +155,7 @@ struct QUEUE
    unsigned long     previousMillis;   // last time we blinked
    unsigned long      blinkInterval;   // interval in millis()
    int                     ledState;   // state of this output
+   int                previousState;   // previous outputstate
 };
 QUEUE volatile *ftn_queue = new QUEUE[17];
 
