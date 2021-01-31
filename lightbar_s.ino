@@ -4,6 +4,18 @@
    TODO: implement change of direction --> forward / backward
 */
 
+/* **********************************************************************************
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY 
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES 
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT 
+SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT 
+OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) 
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE 
+USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+********************************************************************************** */
+
 
 #include <avr/wdt.h> // Needed for automatic reset functions.
 
@@ -25,13 +37,13 @@ SOFTPWM_DEFINE_CHANNEL( 7, DDRD, PORTD, PORTD4);  //Arduino pin D4 --> LB3
 SOFTPWM_DEFINE_CHANNEL( 8, DDRC, PORTC, PORTC3);  //Arduino pin A3 --> LB4
 SOFTPWM_DEFINE_CHANNEL( 9, DDRC, PORTC, PORTC4);  //Arduino pin A4 --> LB5
 SOFTPWM_DEFINE_CHANNEL(10, DDRC, PORTC, PORTC5);  //Arduino pin A5 --> LB6
-SOFTPWM_DEFINE_CHANNEL(11, DDRB, PORTB, PORTB0);  //Arduino pin D8 --> AX1
-SOFTPWM_DEFINE_CHANNEL(12, DDRB, PORTB, PORTB1);  //Arduino pin D9 --> AX2
-SOFTPWM_DEFINE_CHANNEL(13, DDRB, PORTB, PORTB2);  //Arduino pin 10 --> AX3
-SOFTPWM_DEFINE_CHANNEL(14, DDRC, PORTC, PORTC2);  //Arduino pin A2 --> AX4
+// TPWM_DEFINE_CHANNEL(11, DDRB, PORTB, PORTB0);  //Arduino pin D8 --> AX1
+// TPWM_DEFINE_CHANNEL(12, DDRB, PORTB, PORTB1);  //Arduino pin D9 --> AX2
+// TPWM_DEFINE_CHANNEL(13, DDRB, PORTB, PORTB2);  //Arduino pin 10 --> AX3
+// TPWM_DEFINE_CHANNEL(14, DDRC, PORTC, PORTC2);  //Arduino pin A2 --> AX4
 // TPWM_DEFINE_CHANNEL(15, DDRB, PORTB, PORTB5);  //Arduino pin 13 --> LED
 
-SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS( 14, 100);  // Set 15 pulsed outputs
+SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS( 15, 100);  // Set 10 pulsed outputs
 
 
 /* ******************************************************************************* */
@@ -87,11 +99,16 @@ DCC_MSG  Packet ;
 
 extern int __heap_start, *__brkval;
 
-char bomMarker        =   '<';   // Begin of message marker.
-char eomMarker        =   '>';   // End   of message marker.
-char commandString[ 64]      ;   // Max length for a buffer.
-boolean foundBom      = false;   // Found begin of messages.
-boolean foundEom      = false;   // Founf  end  of messages.
+#ifdef _MONITOR_
+
+   char bomMarker        =   '<';   // Begin of message marker.
+   char eomMarker        =   '>';   // End   of message marker.
+   char commandString[ 32]      ;   // Max length for a buffer.
+   char sprintfBuffer[ 32]      ;   // Max length for a buffer.
+   boolean foundBom      = false;   // Found begin of messages.
+   boolean foundEom      = false;   // Founf  end  of messages.
+
+#endif
 
 
 /* ******************************************************************************* */
@@ -332,7 +349,7 @@ void setup()
 
    #if defined(DECODER_LOADED)
 
-      if (Dcc.getCV(CV_DECODER_MASTER_RESET) == CV_DECODER_MASTER_RESET) 
+      if ( Dcc.getCV( CV_DECODER_MASTER_RESET ) == CV_DECODER_MASTER_RESET ) 
       {
       #endif
 
@@ -358,7 +375,7 @@ void setup()
    M_interval = Dcc.getCV( 34 ); //     Standard blink interval  (* 10)
 
    // This is the switch between F0  or  F1 - F14
-   C_between  = Dcc.getCV(111 );
+   C_between  = Dcc.getCV( 111 );
 
    // Loop through all the settings for checking and correcting
    for (int i = 1; i < numfpins - 1; i++)
@@ -393,13 +410,26 @@ void loop()
 
    Dcc.process(); // Loop through the DCC process.
 
-   for (int i = 1; i < numfpins - 2; i++)
+// Check the number of outputs, not the number of numfpins!!!
+   for (unsigned int i = 1; i < Palatis::SoftPWM.size(); ++i)
    {
       switch ( ftn_queue[ i ].inUse )
       {
          case 1:     // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
          {
             Palatis::SoftPWM.set( i, ftn_queue[ i ].maxLevel );
+
+            // if ( currentMicros - ftn_queue[ 16 ].previousMicros > 10000000 )   // once per 10 seconds
+            // {
+            //    ftn_queue[ 16 ].previousMicros = currentMicros;
+            //    _2P( i, DEC);
+            //    _PP("\t");
+            //    _2P( ftn_queue[ i ].maxLevel, DEC);
+            //    _PP("\t");
+            //    _2P(Palatis::SoftPWM.size(), DEC);
+            //    _PL("\t" "> 1 ");
+            //    ftn_queue[ i ].inUse = 0;
+            // }
             break;
          }
 
@@ -471,15 +501,14 @@ void softwareReset( uint8_t preScaler )
 {
    wdt_enable( preScaler );
 
-   while(1) {}  // Wait for the prescaler time to expire and do an auto-reset
+   while( 1 ) {}  // Wait for the prescaler time to expire and do an auto-reset
 }
 
 
 /* ******************************************************************************* */
 
 
-/* *** 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On *** */
-void setAllOutputCVs( int cvvalue )
+void setAllOutputCVs( uint8_t cvvalue )
 {
    noInterrupts();   // Disable interrupts.
 
@@ -501,10 +530,10 @@ void setAllOutputCVs( int cvvalue )
 /* ******************************************************************************* */
 
 
-void setCVvalues( int cvNumber, int cvValue )
+void setFtnQueue( uint16_t cvNumber, uint8_t cvValue )
 {
 
-   _PP( "setCVvalues: ");
+   _PP( "setFTNQueue: ");
    _2P( cvNumber,   DEC);
    _PP( "   Value: "   );
    _2L( cvValue,    DEC);
@@ -585,6 +614,7 @@ void calculateFtnQueue( int number )
    ftn_queue[ number ].previousMicros =     0;
    ftn_queue[ number ].previousMillis =     0;
    ftn_queue[ number ].upDown         = false;
+   ftn_queue[ number ].waitMicros     =     0;
 
    // These values stored in the Configuration Variables
    uint8_t S_maxLevel = Dcc.getCV( 31 + ( number * 5 ));
@@ -635,6 +665,7 @@ void calculateFtnQueue( int number )
 
 #ifdef _MONITOR_
 
+
 /* ******************************************************************************* */
       // 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On  ***
 /* **********************************************************************************
@@ -661,7 +692,7 @@ void calculateFtnQueue( int number )
 void displayText()
 {
    Serial.println(""); // An extra empty line for clearness
-   Serial.println(F("Put in one of the following commands: "                        ));
+   Serial.println(F("Put in one of the following commands: "          ));
    Serial.println(F("------------------------------------------------"));
    Serial.println(F("<0>   all outputs: Power Off"                    ));
    Serial.println(F("<1>   all outputs: Power  On"                    ));
@@ -673,16 +704,15 @@ void displayText()
    Serial.println(F("<C>   clear everything: Factory Default"         ));
    Serial.println(F("<D>   prints CV values: to your monitor"         ));
    Serial.println("");
-   Serial.println(F("<f>   controls decoder functions F0-F14: <f x y>"));
-   Serial.println(F("<F>   dump the functionqueue and settings: <F>"  ));
+   Serial.println(F("<f>   control decoder functions F0-F14: <f x y> "));
+   Serial.println(F("<F>   dump the functionqueue and settings: <F>  "));
    Serial.println("");
    Serial.println(F("<M>   list the available SRAM on the chip"       ));
    Serial.println("");
    Serial.println(F("<R>   reads a configuration variable: <R x>"     ));
    Serial.println(F("<W>   write a configuration variable: <W x y>"   ));
-   Serial.println(F("------------------------------------------------"));
+   Serial.println(F("----------------------------------------------- "));
    Serial.println(F("* include '<', '>' and spaces in your command * "));
-   // Serial.println(F("Include < and > in your command   -and-   spaces are mandatory"));
    Serial.println(""); // An extra empty line for clearness
 }
 
@@ -833,27 +863,28 @@ void parseCom( char *com )
       }
 
 
-/***** DUMPS CONFIGURATION VARIABLES FROM DECODER ****/
+/***** DUMPS ALL FTNQUEUE SETTINGS FOR ALL OUTPUTS ****/
 
       case 'F':     // <F>
 /*
- *    dumps all Configuration Variables from the decoder
+ *    dumps all FTNqueue settings from memory
  *
- *    returns a list of: <CV VALUE)
- *    where VALUE is a number from 0-255 as read from the CV, or -1 if read could not be verified
+ *    returns a list of: <settings>
  */
       {
-         FactoryDefaultCVIndex = sizeof( FactoryDefaultCVs ) / sizeof( CVPair );
-
-         for (int i = 0; i < FactoryDefaultCVIndex; i++)
+         _ML("\n\npin  iU     prevMic     waitMic  fC  mL  uD     prevMil     blnkInt  lS  pS \n");
+         for (int i = 1; i < numfpins - 2; i++)
          {
-            uint8_t cvValue = Dcc.getCV( FactoryDefaultCVs[ i ].CV );
-
-            _MP( " cv: "                      );
-            _3P( FactoryDefaultCVs[i].CV, DEC );
-            _MP( "\t"              " value: " );
-            _3L( cvValue, DEC                 );
+            sprintf( sprintfBuffer, " %2i %3i %11lu"  , i, ftn_queue[ i ].inUse, ftn_queue[ i ].previousMicros );
+            _MP( sprintfBuffer );
+            sprintf( sprintfBuffer, " %11lu %3i %3i"  , ftn_queue[ i ].waitMicros, ftn_queue[ i ].fadeCounter, ftn_queue[ i ].maxLevel );
+            _MP( sprintfBuffer );
+            sprintf( sprintfBuffer, " %3i %11lu %11lu", ftn_queue[ i ].upDown, ftn_queue[ i ].previousMillis, ftn_queue[ i ].blinkInterval );
+            _MP( sprintfBuffer );
+            sprintf( sprintfBuffer, " %3i %3i "       , ftn_queue[ i ].ledState, ftn_queue[ i ].previousState );
+            _ML( sprintfBuffer );
          }
+         _ML( "\n" );
          break;
       }
 
@@ -1138,24 +1169,24 @@ void    notifyDccFunc( uint16_t Addr, DCC_ADDR_TYPE AddrType, FN_GROUP FuncGrp, 
  *  Returns:
  *    None
  */
-void notifyCVChange(uint16_t CV, uint8_t Value)
+void    notifyCVChange( uint16_t CV, uint8_t Value )
 {
    _PP( " notifyCVChange: CV: ");
    _2P( CV, DEC    );
    _PP( " Value: " );
    _2L( Value, DEC );
 
-   setCVvalues( CV, Value );
+   setFtnQueue( CV, Value );
 }
 
-void    notifyDccCVChange( uint16_t CV, uint8_t Value)
+void    notifyDccCVChange( uint16_t CV, uint8_t Value )
 {
    _PP( " notifyDccCVChange: CV: ");
    _2P( CV,     DEC);
    _PP( " Value: " );
    _2L( Value,  DEC);
 
-   setCVvalues( CV, Value);
+   setFtnQueue( CV, Value );
 }
 
 
@@ -1170,11 +1201,11 @@ void    notifyDccCVChange( uint16_t CV, uint8_t Value)
  *
  *  Inputs:
  *    None
- *                                                                                                        *
+ *
  *  Returns:
  *    None
  */
-void notifyCVResetFactoryDefault()
+void    notifyCVResetFactoryDefault()
 {
    // Make 'FactoryDefaultCVIndex' non-zero and equal to num CVs to be reset 
    // to flag to the loop() function that a reset to FacDef needs to be done.
