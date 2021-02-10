@@ -13,4 +13,6 @@ VALUE_1 = env.GetProjectOption("custom_option1")
 
 env['PROJECT_SRC_DIR'] = env['PROJECT_DIR'] + VALUE_1
 
+# env.Append(CPPDEFINES=[('#undef', _DEBUG_)])
+
 print("Setting the project directory to: {}".format(env['PROJECT_SRC_DIR']))
