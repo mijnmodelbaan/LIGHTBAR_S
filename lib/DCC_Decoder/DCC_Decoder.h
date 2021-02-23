@@ -58,6 +58,42 @@
     // CV 1..256 are supported
 #define kCV_MAX                       257
 
+    // Function button masks - F0 - F28
+#define FN_BIT_00	0x10
+#define FN_BIT_01	0x01
+#define FN_BIT_02	0x02
+#define FN_BIT_03	0x04
+#define FN_BIT_04	0x08
+
+#define FN_BIT_05	0x01
+#define FN_BIT_06	0x02
+#define FN_BIT_07	0x04
+#define FN_BIT_08	0x08
+
+#define FN_BIT_09	0x01
+#define FN_BIT_10	0x02
+#define FN_BIT_11	0x04
+#define FN_BIT_12	0x08
+
+#define FN_BIT_13	0x01
+#define FN_BIT_14	0x02
+#define FN_BIT_15	0x04
+#define FN_BIT_16	0x08
+#define FN_BIT_17	0x10
+#define FN_BIT_18	0x20
+#define FN_BIT_19	0x40
+#define FN_BIT_20	0x80
+
+#define FN_BIT_21	0x01
+#define FN_BIT_22	0x02
+#define FN_BIT_23	0x04
+#define FN_BIT_24	0x08
+#define FN_BIT_25	0x10
+#define FN_BIT_26	0x20
+#define FN_BIT_27	0x40
+#define FN_BIT_28	0x80
+
+
 ///////////////////////////////////////////////////////////////////////////////////////
 
 typedef boolean (*RawPacket)(byte byteCount, byte* packetBytes);

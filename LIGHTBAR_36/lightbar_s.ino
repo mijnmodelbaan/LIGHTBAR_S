@@ -34,21 +34,27 @@ SOFTPWM_DEFINE_CHANNEL( 4, DDRD, PORTD, PORTD3);  //Arduino pin D3 --> LS4
 SOFTPWM_DEFINE_CHANNEL( 5, DDRD, PORTD, PORTD6);  //Arduino pin D6 --> LB1
 SOFTPWM_DEFINE_CHANNEL( 6, DDRC, PORTC, PORTC0);  //Arduino pin A0 --> LB2
 SOFTPWM_DEFINE_CHANNEL( 7, DDRD, PORTD, PORTD4);  //Arduino pin D4 --> LB3
-SOFTPWM_DEFINE_CHANNEL( 8, DDRC, PORTC, PORTC3);  //Arduino pin A3 --> LB4
-SOFTPWM_DEFINE_CHANNEL( 9, DDRC, PORTC, PORTC4);  //Arduino pin A4 --> LB5
-SOFTPWM_DEFINE_CHANNEL(10, DDRC, PORTC, PORTC5);  //Arduino pin A5 --> LB6
-// TPWM_DEFINE_CHANNEL(11, DDRB, PORTB, PORTB0);  //Arduino pin D8 --> AX1
-// TPWM_DEFINE_CHANNEL(12, DDRB, PORTB, PORTB1);  //Arduino pin D9 --> AX2
-// TPWM_DEFINE_CHANNEL(13, DDRB, PORTB, PORTB2);  //Arduino pin 10 --> AX3
-// TPWM_DEFINE_CHANNEL(14, DDRC, PORTC, PORTC2);  //Arduino pin A2 --> AX4
-// TPWM_DEFINE_CHANNEL(15, DDRB, PORTB, PORTB5);  //Arduino pin 13 --> LED
+
+#if defined( LAMPS36 )
+
+   SOFTPWM_DEFINE_CHANNEL( 8, DDRC, PORTC, PORTC3);  //Arduino pin A3 --> LB4
+   SOFTPWM_DEFINE_CHANNEL( 9, DDRC, PORTC, PORTC4);  //Arduino pin A4 --> LB5
+   SOFTPWM_DEFINE_CHANNEL(10, DDRC, PORTC, PORTC5);  //Arduino pin A5 --> LB6
+   SOFTPWM_DEFINE_CHANNEL(11, DDRB, PORTB, PORTB0);  //Arduino pin D8 --> AX1
+   SOFTPWM_DEFINE_CHANNEL(12, DDRB, PORTB, PORTB1);  //Arduino pin D9 --> AX2
+   SOFTPWM_DEFINE_CHANNEL(13, DDRB, PORTB, PORTB2);  //Arduino pin 10 --> AX3
+   SOFTPWM_DEFINE_CHANNEL(14, DDRC, PORTC, PORTC2);  //Arduino pin A2 --> AX4
+
+#endif
+
+SOFTPWM_DEFINE_CHANNEL(15, DDRB, PORTB, PORTB5);  //Arduino pin 13 --> LED
 
 SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS( 15, 100);  // Set 10 pulsed outputs
 
 
-/* ******************************************************************************* */
-
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
 // ***** Uncomment to use the PinChangeInterrupts iso External Interrupts *****
 // #define PIN_CHANGE_INT
 
@@ -58,14 +64,23 @@ NmraDcc     Dcc ;
 DCC_MSG  Packet ;
 
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
 // ******** UNLESS YOU WANT ALL CV'S RESET UPON EVERY POWER UP REMOVE THE "//" IN THE FOLLOWING LINE!!
 #define DECODER_LOADED
 
+// ******** REMOVE THE "//" IN THE FOLLOWING LINE TO SEND DEBUGGING INFO TO THE SERIAL OUTPUT
+// #define DEBUG36
 
-// ******** REMOVE THE "//" IN THE FOLLOWING LINE TO SEND DEBUGGING INFO TO THE SERIAL MONITOR
-// #define _DEBUG_
+// ******** REMOVE THE "//" IN THE NEXT LINE IF YOU WANT TO USE YOUR SERIAL PORT FOR COMMANDS
+// #define MONITOR
 
-#ifdef _DEBUG_
+// ******** REMOVE THE "//" IN THE FOLLOWING LINE TO USE AS A '6LAMP PCB WITH AUX PORTS' ELSE IT'S A '3LAMP W/O AUX PORTS'
+// #define LAMPS36
+
+
+#ifdef DEBUG36
    #define _PP( a ) Serial.print(    a );
    #define _PL( a ) Serial.println(  a );
    #define _2P(a,b) Serial.print( a, b );
@@ -78,10 +93,7 @@ DCC_MSG  Packet ;
 #endif
 
 
-// ******** REMOVE THE "//" IN THE NEXT LINE IF YOU WANT TO USE YOUR SERIAL PORT FOR COMMANDS
-// #define _MONITOR_
-
-#ifdef _MONITOR_
+#ifdef MONITOR
    #define _MP( a ) Serial.print(    a );
    #define _ML( a ) Serial.println(  a );
    #define _3P(a,b) Serial.print(  a, b);
@@ -94,12 +106,13 @@ DCC_MSG  Packet ;
 #endif
 
 
-/* ******************************************************************************* */
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 extern int __heap_start, *__brkval;
 
-#ifdef _MONITOR_
+#ifdef MONITOR
 
    char bomMarker        =   '<';   // Begin of message marker.
    char eomMarker        =   '>';   // End   of message marker.
@@ -155,7 +168,7 @@ const int FunctionPin15  = 19;  // PC5  LB6
 
 
 #define SET_CV_Address       24  // THIS ADDRESS IS FOR SETTING CV'S  (LIKE A LOCO)
-#define Accessory_Address    40  // THIS ADDRESS IS THE ADDRESS OF THIS DCC DECODER
+#define Accessory_Address   140  // THIS ADDRESS IS THE ADDRESS OF THIS DCC DECODER
 
 uint8_t CV_DECODER_MASTER_RESET  = 120; // THIS IS THE CV ADDRESS OF THE FULL RESET
 #define CV_To_Store_SET_CV_Address 121
@@ -174,7 +187,7 @@ struct QUEUE
    int                     ledState;   // state of this output
    int                previousState;   // previous outputstate
 };
-QUEUE volatile *ftn_queue = new QUEUE[17];
+QUEUE volatile *ftn_queue = new QUEUE[ 17 ];
 
 struct CVPair
 {
@@ -244,6 +257,9 @@ CVPair FactoryDefaultCVs [] =
    { 67, 100}, //     Waitmicros output highend
    { 68,   5}, //     Waitmicros output divider
    { 69, 100}, //     Blinkinterval this output
+
+#if defined( LAMPS36 )
+
    { 70,   0}, // LB4 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    { 71,  50}, //     Maximum level this output
    { 72, 100}, //     Waitmicros output highend
@@ -279,6 +295,9 @@ CVPair FactoryDefaultCVs [] =
    {102,   0}, //     Waitmicros output highend
    {103,   0}, //     Waitmicros output divider
    {104,   0}, //     Blinkinterval this output
+
+#endif // LAMPS36
+
    {105,   1}, // LED 0 = Off, 1 = On, 2 = Blink Off, 3 = Blink On, 4 = Fade Off, 5 = Fade On
    {106,  50}, //     Maximum level this output
    {107, 100}, //     Waitmicros output highend
@@ -320,7 +339,7 @@ void setup()
    // Start SoftPWM with 60hz pwm frequency
    Palatis::SoftPWM.begin( 60);
 
-   #if defined(_DEBUG_) || defined(_MONITOR_)
+   #if defined(DEBUG36) || defined(MONITOR)
 
       Serial.begin(115200);
 
@@ -383,7 +402,7 @@ void setup()
       calculateFtnQueue( i );
    }
 
-   #ifdef _MONITOR_
+   #ifdef MONITOR
       displayText(); // Shows the standard text.
    #endif
 
@@ -469,7 +488,7 @@ void loop()
       }
    }
 
-   #ifdef _MONITOR_
+   #ifdef MONITOR
 
       if (foundEom)
       {
@@ -508,10 +527,14 @@ void setAllOutputCVs( uint8_t cvvalue )
 
    interrupts();  // Enable the interrupts.
 
-   // Send feedback if requested.
-   _MP( "\t" "<" );
-   _3P( cvvalue, DEC );
-   _ML( ">" );
+   #if defined(DEBUG36) || defined(MONITOR)
+
+      // Send feedback if requested.
+      _MP( "\t" "<" );
+      _3P( cvvalue, DEC );
+      _ML( ">" );
+
+   #endif
 }
 
 
@@ -521,10 +544,14 @@ void setAllOutputCVs( uint8_t cvvalue )
 void setFtnQueue( uint16_t cvNumber, uint8_t cvValue )
 {
 
-   _PP( "setFTNQueue: ");
-   _2P( cvNumber,   DEC);
-   _PP( "   Value: "   );
-   _2L( cvValue,    DEC);
+   #if defined(DEBUG36) || defined(MONITOR)
+
+      _PP( "setFTNQueue: ");
+      _2P( cvNumber,   DEC);
+      _PP( "   Value: "   );
+      _2L( cvValue,    DEC);
+
+   #endif
 
    switch ( cvNumber )
    {
@@ -590,11 +617,15 @@ void calculateFtnQueue( int number )
    // Now we're going to do some calculations
    ftn_queue[ number ].inUse = Dcc.getCV( 30 + ( number * 5 ) );
 
-   // Print some values  -  if requested
-   _PP( "\t" "calculateFtnQueue  cv: ");
-   _2P( 30 + ( number * 5 ),       DEC);
-   _PP( "\t"                " value: ");
-   _2L( ftn_queue[ number ].inUse, DEC);
+   #if defined(DEBUG36) || defined(MONITOR)
+
+      // Print some values  -  if requested
+      _PP( "\t" "calculateFtnQueue  cv: ");
+      _2P( 30 + ( number * 5 ),       DEC);
+      _PP( "\t"                " value: ");
+      _2L( ftn_queue[ number ].inUse, DEC);
+
+   #endif
 
    // Default settings for counters and states
    ftn_queue[ number ].fadeCounter    =     0;
@@ -651,7 +682,7 @@ void calculateFtnQueue( int number )
 /* ******************************************************************************* */
 // The next part will / can only be used for an mpu with enough memory
 
-#ifdef _MONITOR_
+#if defined(MONITOR)
 
 
 /* ******************************************************************************* */
@@ -736,7 +767,7 @@ void serialEvent() {
    }
 }
 
-#endif   // _MONITOR_
+#endif   // MONITOR
 
 
 /* ******************************************************************************* */
@@ -808,6 +839,7 @@ void parseCom( char *com )
          break;
       }
 
+      #if defined(DEBUG36) || defined(MONITOR)
 
 /****  CLEAR SETTINGS TO FACTORY DEFAULTS  ****/
 
@@ -820,8 +852,12 @@ void parseCom( char *com )
       {
          uint8_t cvCheck = Dcc.setCV( 120, 120 );
 
-         _MP( "\t"  "<FD done>"  "\t" );
-         _3L( cvCheck, DEC );
+         #if defined(DEBUG36) || defined(MONITOR)
+
+            _MP( "\t"  "<FD done>"  "\t" );
+            _3L( cvCheck, DEC );
+
+         #endif
 
          softwareReset(  WDTO_15MS  );
          break;
@@ -844,10 +880,15 @@ void parseCom( char *com )
          {
             uint8_t cvValue = Dcc.getCV( FactoryDefaultCVs[ i ].CV );
 
-            _MP( " cv: "                      );
-            _3P( FactoryDefaultCVs[i].CV, DEC );
-            _MP( "\t"              " value: " );
-            _3L( cvValue, DEC                 );
+            #if defined(DEBUG36) || defined(MONITOR)
+
+               _MP( " cv: "                      );
+               _3P( FactoryDefaultCVs[i].CV, DEC );
+               _MP( "\t"              " value: " );
+               _3L( cvValue, DEC                 );
+
+            #endif
+
          }
          break;
       }
@@ -862,7 +903,7 @@ void parseCom( char *com )
  *    returns a list of: <settings>
  */
       {
-         #ifdef _MONITOR_
+         #if defined(DEBUG36) || defined(MONITOR)
 
             _ML("\n\npin  iU     prevMic     waitMic  fC  mL  uD     prevMil     blnkInt  lS  pS \n");
             for (int i = 1; i < numfpins - 2; i++)
@@ -877,8 +918,9 @@ void parseCom( char *com )
                _ML( sprintfBuffer );
             }
             _ML( "\n" );
-            
-         #endif   // _MONITOR_
+
+         #endif
+
          break;
       }
 
@@ -899,10 +941,15 @@ void parseCom( char *com )
          {
             uint8_t cvValue = Dcc.getCV( FactoryDefaultCVs[ i ].CV );
 
-            _MP( " cv: "                      );
-            _3P( FactoryDefaultCVs[i].CV, DEC );
-            _MP( "\t"              " value: " );
-            _3L( cvValue, DEC                 );
+            #if defined(DEBUG36) || defined(MONITOR)
+
+               _MP( " cv: "                      );
+               _3P( FactoryDefaultCVs[i].CV, DEC );
+               _MP( "\t"              " value: " );
+               _3L( cvValue, DEC                 );
+
+            #endif
+
          }
          break;
       }
@@ -946,11 +993,15 @@ void parseCom( char *com )
 
          uint8_t cvCheck = Dcc.getCV( cv );
 
-         _MP( "<r " );
-         _3P( cv + 0 , DEC );
-         _MP( " "   );
-         _3P( cvCheck, DEC );
-         _ML( ">"   );
+         #if defined(DEBUG36) || defined(MONITOR)
+
+            _MP( "<r " );
+            _3P( cv + 0 , DEC );
+            _MP( " "   );
+            _3P( cvCheck, DEC );
+            _ML( ">"   );
+
+         #endif
 
          break;
       }
@@ -975,11 +1026,15 @@ void parseCom( char *com )
 
          uint8_t cvCheck = Dcc.setCV( cv, bValue );
 
-         _MP( "<w " );
-         _3P( cv + 0 , DEC );
-         _MP( " "   );
-         _3P( cvCheck, DEC );
-         _ML( ">"   );
+         #if defined(DEBUG36) || defined(MONITOR)
+
+            _MP( "<w " );
+            _3P( cv + 0 , DEC );
+            _MP( " "   );
+            _3P( cvCheck, DEC );
+            _ML( ">"   );
+
+         #endif
 
          break;
       }
@@ -996,13 +1051,14 @@ void parseCom( char *com )
       {
          _ML("");
 
-         #ifdef _MONITOR_
+         #ifdef MONITOR
             displayText(); // Shows the standard explanation text
          #endif
 
          break;
       }
 
+      #endif
 
 /****  DEFAULT FOR THE SWITCH FUNCTION = NO ACTION  ****/
 
@@ -1100,7 +1156,7 @@ void    notifyDccFunc( uint16_t Addr, DCC_ADDR_TYPE AddrType, FN_GROUP FuncGrp, 
    }
    else
    {
-      switch(FuncGrp)
+      switch( FuncGrp )
       {
          case FN_0_4:    //Function Group 1 F0 F4 F3 F2 F1
          {
@@ -1163,10 +1219,15 @@ void    notifyDccFunc( uint16_t Addr, DCC_ADDR_TYPE AddrType, FN_GROUP FuncGrp, 
  */
 void    notifyCVChange( uint16_t CV, uint8_t Value )
 {
-   _PP( " notifyCVChange: CV: ");
-   _2P( CV, DEC    );
-   _PP( " Value: " );
-   _2L( Value, DEC );
+
+   #if defined(DEBUG36) || defined(MONITOR)
+
+      _PP( " notifyCVChange: CV: ");
+      _2P( CV, DEC    );
+      _PP( " Value: " );
+      _2L( Value, DEC );
+
+   #endif
 
    setFtnQueue( CV, Value );
 }
