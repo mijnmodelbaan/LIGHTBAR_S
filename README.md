@@ -1,7 +1,34 @@
 # LIGHTBAR_S
 DCC controlled lights for model railroads.
 
-This will be the first installment, designed for small carriages and vans.
+Here one can find several sketches for the Arduino framework on the Atmel platform.
+The sketches are merely based on other persons work, with some changes for my need.
+
+Some sketches are created for my version of Geoff Bunza's IDEC ideas.
+Some are created for my LightBar system, designed for small carriages and vans.
+
+AVR_TRAFFIC:
+LIGHTBAR_TR:
+
+Sequential traffic light system, based on Geoff's 'IDEC2_5_LargeFunctionSets'
+AVR_TRAFFIC has the whole sequence written out, like the original.
+LIGHTBAR_TR has some modifications (functions) which saves 6K in the sketch.
+
+
+IDEC_5L2M1S
+IDEC_BMULTI
+IDEC_MULTIF
+IDEC_WELDER
+
+LIGHTBAR_36
+LIGHTBAR_T1
+LIGHTBAR_T2
+LIGHTBAR_T3
+LIGHTBAR_T4
+LIGHTBAR_T5
+
+
+
 
 The module (pcb) will be app. 50 x 10mm.
 
