@@ -174,7 +174,7 @@ uint8_t CV_DECODER_MASTER_RESET = 252;
  * right after Setup has finished. Setting the last CV ( 65, 81, 97, 113, 129, 145, 161
  * 177, 193, 209) of a Switch Set to Non-Zero, keeps the Set running untill F0 Disables
  * the decoder or forever. Setting the CV to 0 again stops the Set when it runs out. */
-byte  ss1[ ] = { 1, 0, 0, 0, 0, 0};   unsigned long ss1delay   =  0;  //  Switch Set  1
+byte  ss1[ ] = { 0, 0, 0, 0, 0, 0};   unsigned long ss1delay   =  0;  //  Switch Set  1
 byte  ss2[ ] = { 0, 0, 0, 0, 0, 0};   unsigned long ss2delay   =  0;  //  Switch Set  2
 byte  ss3[ ] = { 0, 0, 0, 0, 0, 0};   unsigned long ss3delay   =  0;  //  Switch Set  3
 byte  ss4[ ] = { 0, 0, 0, 0, 0, 0};   unsigned long ss4delay   =  0;  //  Switch Set  4
@@ -188,7 +188,7 @@ byte ss10[ ] = { 0, 0, 0, 0, 0, 0};   unsigned long ss10delay  =  0;  //  Switch
 
 const int MasterDecoderDisablePin  =   14;  //  A0  Master Decoder Disable Input Pin | Active  LOW
 const int num_active_functions     =   11;  //  Number of Functions starting with F0
-const int FunctionPin0             =   16;  //  A2  DFPlayer Transmit (TX)
+const int FunctionPin0             =   15;  //  A2  DFPlayer Transmit (TX)
 const int FunctionPinDcc           =    2;  //  Inputpin DCCsignal
 const int audiocmddelay            =   34;
 
@@ -243,15 +243,15 @@ CVPair FactoryDefaultCVs [] =
 
    { 30,   0},  //  F0  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
    { 31,   1},  //  F1  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
-   { 32,  11},  //  F2  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
-   { 33,  11},  //  F3  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
-   { 34,  11},  //  F4  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
-   { 35,  11},  //  F5  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
-   { 36,  11},  //  F6  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
-   { 37,  11},  //  F7  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
-   { 38,  11},  //  F8  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
-   { 39,  11},  //  F9  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
-   { 40,  11},  // F10  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
+   { 32,   2},  //  F2  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
+   { 33,   3},  //  F3  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
+   { 34,   4},  //  F4  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
+   { 35,   5},  //  F5  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
+   { 36,   6},  //  F6  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
+   { 37,   7},  //  F7  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
+   { 38,   8},  //  F8  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
+   { 39,   9},  //  F9  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
+   { 40,  10},  // F10  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
    { 41,  11},  // F11  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
    { 42,  11},  // F12  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
    { 43,  11},  // F13  Config 0=DISABLE On/Off, 1-8=Switch Control 1-10, 11=LED On/Off
@@ -261,20 +261,20 @@ CVPair FactoryDefaultCVs [] =
    //  Switch Mode | 0=NOP, 1=0/1, 2=RND, 3=WRND, 4=SND, 5=SRVO, 6=Dual Pin, 7=Next SS, 8=Next SS Conditional
    { 50,  10},  //  Wait1 = 0 - 254 * MasterTimeConstant Seconds  |  Switch SET  1
    { 51,   1},  //  Switch Mode
-   { 52, 141},  //  Switch Pin1
+   { 52, 142},  //  Switch Pin1
    { 53,  10},  //  Wait2 = 0 - 254 * MasterTimeConstant Seconds
    { 54,   1},  //  Switch Mode
-   { 55,  13},  //  Switch Pin2
+   { 55,  14},  //  Switch Pin2
    { 56,  10},  //  Wait3 = 0 - 254 * MasterTimeConstant Seconds
    { 57,   1},  //  Switch Mode
-   { 58, 141},  //  Switch Pin3
+   { 58, 142},  //  Switch Pin3
    { 59,  10},  //  Wait4 = 0 - 254 * MasterTimeConstant Seconds
    { 60,   1},  //  Switch Mode
-   { 61,  13},  //  Switch Pin4
+   { 61,  14},  //  Switch Pin4
    { 62,   0},  //  Wait5 = 0 - 254 * MasterTimeConstant Seconds
    { 63,   0},  //  Switch Mode
    { 64,   0},  //  Switch Pin5
-   { 65,   1},  //  Not 0 if the set has to be kept running after starting it
+   { 65,   0},  //  Not 0 if the set has to be kept running after starting it
 
    //  Switch Mode | 0=NOP, 1=0/1, 2=RND, 3=WRND, 4=SND, 5=SRVO, 6=Dual Pin, 7=Next SS, 8=Next SS Conditional
    { 66,   0},  //  Wait1 = 0 - 254 * MasterTimeConstant Seconds  |  Switch SET  2

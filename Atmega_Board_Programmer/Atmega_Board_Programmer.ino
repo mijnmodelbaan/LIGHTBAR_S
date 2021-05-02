@@ -10,7 +10,7 @@
 #define USE_ATMEGA8        true
 #define USE_ATMEGA16U2    false    // Uno USB interface chip
 #define USE_ATMEGA32U4    false    // Leonardo
-#define USE_ATMEGA168     false
+#define USE_ATMEGA168      true
 #define USE_ATMEGA1280    false
 #define USE_ATMEGA1284    false
 #define USE_ATMEGA2560    false
@@ -120,6 +120,7 @@ const int ENTER_PROGRAMMING_ATTEMPTS = 50;
 #include <SPI.h>
 #include <avr/pgmspace.h>
 
+//#include "Programming_Utils.ino"
 
 const unsigned long BAUD_RATE = 115200;
 
@@ -137,7 +138,21 @@ const byte CLOCKOUT = 9;
     const byte SCK = 13;    // SPI clock
   #endif
 
+//  #include "ICSP_Utils.ino"
+
 #endif // ICSP_PROGRAMMING
+
+#if HIGH_VOLTAGE_PARALLEL
+
+  #include "HV_Parallel_Utils.ino"
+
+#endif // HIGH_VOLTAGE_PARALLEL
+
+#if HIGH_VOLTAGE_SERIAL
+
+  #include "HV_Serial_Utils.ino"
+
+#endif // HIGH_VOLTAGE_SERIAL
 
 
 #include "HV_Pins.h"
@@ -605,7 +620,7 @@ void loop ()
     // if we found a signature try to write a bootloader
     if (foundSig != -1)
       writeBootloader ();
-    stopProgramming ();
+      stopProgramming ();
     }   // end of if entered programming mode OK
 
 

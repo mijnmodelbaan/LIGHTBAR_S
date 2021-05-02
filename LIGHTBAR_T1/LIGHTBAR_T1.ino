@@ -30,7 +30,7 @@ Task taskT01( 1000, TASK_FOREVER, &taskT01Callback, NULL, NULL, NULL, NULL );
 
 /* this task starts the blinking of the LEDs */
 void taskTL0Callback();
-Task taskT02(  100, TASK_FOREVER, &taskTL0Callback, NULL, NULL, NULL, NULL );
+Task taskT02(  250, TASK_FOREVER, &taskTL0Callback, NULL, NULL, NULL, NULL );
 
 /* task used to (re)connect MQTT - runs every 5 seconds, if WiFi connected */
 void taskT03Callback();

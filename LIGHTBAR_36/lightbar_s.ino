@@ -49,7 +49,7 @@ SOFTPWM_DEFINE_CHANNEL( 7, DDRD, PORTD, PORTD4);  //Arduino pin D4 --> LB3
 
 SOFTPWM_DEFINE_CHANNEL(15, DDRB, PORTB, PORTB5);  //Arduino pin 13 --> LED
 
-SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS( 15, 100);  // Set 10 pulsed outputs
+SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS( 15, 100);  // Set 15 pulsed outputs
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
