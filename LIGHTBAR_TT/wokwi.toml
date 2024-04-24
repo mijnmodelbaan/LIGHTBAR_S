@@ -1,0 +1,5 @@
+[wokwi]
+version = 1
+firmware = '../.pioenvs/UNO_TT/firmware.hex'
+elf = '../.pioenvs/UNO_TT/firmware.elf'
+gdbServerPort=3333

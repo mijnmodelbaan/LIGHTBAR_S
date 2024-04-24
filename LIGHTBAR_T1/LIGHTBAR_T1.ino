@@ -2,12 +2,19 @@
 
 /* -------------   This sketch pulses 17 outputs in a continuous loop:   -------------
  * 
- * PD3, PD4, PD5, PD6, PD7, PB0, PB1, PB2, PB3, PB4, PC0, PC1, PC2, PC3, PC4, PC5, PB5
+ * PD3, PD4, PD5, PD6, PD7, PB0, PB1, PB2, PB3, PB4, PB5, PC0, PC1, PC2, PC3, PC4, PC5
  * ----------------------------------------------------------------------------------- */
 
+#define _TASK_SLEEP_ON_IDLE_RUN // will compile the library with the sleep option enabled (AVR boards only).
 
-#include "avr\io.h"
-#include "TaskScheduler.h"
+
+#include <Arduino.h> // Needed for C++ conversion of INOfile.
+
+#include <avr/wdt.h> // Needed for automatic reset functions.
+
+#include <avr/io.h>  // AVR device-specific  IO  definitions.
+
+#include <TaskScheduler.h>
 
 
 Scheduler  taskTimer;
@@ -16,11 +23,15 @@ Scheduler  taskTimer;
 #define _DEBUG_
 
 #if defined(_DEBUG_) || defined(_TEST_)
-   #define _PP(a) Serial.print(a);
-   #define _PL(a) Serial.println(a);
+   #define _PP( a ) Serial.print(    a );
+   #define _PL( a ) Serial.println(  a );
+   #define _2P(a,b) Serial.print( a, b );
+   #define _2L(a,b) Serial.println(a, b);
 #else
-   #define _PP(a)
-   #define _PL(a)
+   #define _PP( a )
+   #define _PL( a )
+   #define _2P(a,b)
+   #define _2L(a,b)
 #endif
 
 
@@ -36,30 +47,55 @@ Task taskT02(  250, TASK_FOREVER, &taskTL0Callback, NULL, NULL, NULL, NULL );
 void taskT03Callback();
 Task taskT03( 5000, TASK_FOREVER, &taskT03Callback, NULL, NULL, NULL, NULL );
 
+/* declared custom functions before they will be called */
+void taskL01Callback();
+void taskL02Callback();
+void taskL03Callback();
+void taskL04Callback();
+void taskL05Callback();
+void taskL06Callback();
+void taskL07Callback();
+void taskL08Callback();
+void taskL09Callback();
+void taskL10Callback();
+void taskL11Callback();
+void taskL12Callback();
+void taskL13Callback();
+void taskL14Callback();
+void taskL15Callback();
+void taskL16Callback();
+void taskLEDCallback();
+
 
 void setup()
 {
+   noInterrupts();
 
    DDRB = DDRB | 0b00111111;  // Set bits B[5-0] as outputs, leave the rest as-is.
    DDRC = DDRC | 0b00111111;  // Set bits C[5-0] as outputs, leave the rest as-is.
    DDRD = DDRD | 0b11111000;  // Set bits D[7-3] as outputs, leave the rest as-is.
 
    #if defined(_DEBUG_) || defined(_TEST_)
-  
+
       Serial.begin(115200);
-  
+
       while (!Serial)
       {
          ; // wait for Serial port to connect. Needed for native USB port.
       }
+
       Serial.flush();    // Wait for all the rubbish to finish displaying.
-      while (Serial.available() > 0) {
-         Serial.read();
+
+      while (Serial.available() > 0)
+      {
+         Serial.read(); // Clear the input buffer to get 'real' inputdata.
       }
-  
+
    #endif
-  
-   _PL("TaskScheduler Starting");
+
+   _PL( "-------------------------------------" );
+   _PL( "***   TaskScheduler is Starting   ***" );
+   _PL( "-------------------------------------" );
 
 
    /* initialize (and enable) all necessary schedules */
@@ -69,16 +105,20 @@ void setup()
    taskTimer.addTask( taskT02 );
    taskTimer.addTask( taskT03 );
 
-   taskT01.enableDelayed( 1500);
-   taskT02.enableDelayed( 1250);
-   taskT03.enableDelayed( 1500);
+   taskT01.enableDelayed(    0);
+   taskT02.enableDelayed(    0);
+   taskT03.enableDelayed(    0);
+
+   _PL( "***   TaskScheduler has Started   ***" );
+   _PL( "-------------------------------------" );
+
+  interrupts();  // Ready to rumble....
 }
 
 
 void loop()
 {
-
-   taskTimer.execute(); // Keep all the timers running...
+  taskTimer.execute(); // Keep all the timers running...
 }
 
 
@@ -226,7 +266,7 @@ void taskL11Callback()
 {
    /* switch ON the next  LED */
 
-   PORTC = PORTC | 0b00000001;   // PC0
+   PORTB = PORTB | 0b00100000;   // PB5
 
    _PL("TaskScheduler taskL11Callback");
 
@@ -238,7 +278,7 @@ void taskL12Callback()
 {
    /* switch ON the next  LED */
 
-   PORTC = PORTC | 0b00000010;   // PC1
+   PORTC = PORTC | 0b00000001;   // PC0
 
    _PL("TaskScheduler taskL12Callback");
 
@@ -250,7 +290,7 @@ void taskL13Callback()
 {
    /* switch ON the next  LED */
 
-   PORTC = PORTC | 0b00000100;   // PC2
+   PORTC = PORTC | 0b00000010;   // PC1
 
    _PL("TaskScheduler taskL13Callback");
 
@@ -262,7 +302,7 @@ void taskL14Callback()
 {
    /* switch ON the next  LED */
 
-   PORTC = PORTC | 0b00001000;   // PC3
+   PORTC = PORTC | 0b00000100;   // PC2
 
    _PL("TaskScheduler taskL14Callback");
 
@@ -274,7 +314,7 @@ void taskL15Callback()
 {
    /* switch ON the next  LED */
 
-   PORTC = PORTC | 0b00010000;   // PC4
+   PORTC = PORTC | 0b00001000;   // PC3
 
    _PL("TaskScheduler taskL15Callback");
 
@@ -286,7 +326,7 @@ void taskL16Callback()
 {
    /* switch ON the next  LED */
 
-   PORTC = PORTC | 0b00100000;   // PC5
+   PORTC = PORTC | 0b00010000;   // PC4
 
    _PL("TaskScheduler taskL16Callback");
 
@@ -297,7 +337,7 @@ void taskLEDCallback()
 {
    /* switch ON the next  LED */
 
-   PORTB = PORTB | 0b00100000;   // PB5
+   PORTC = PORTC | 0b00100000;   // PC5
 
    _PL("TaskScheduler taskLEDCallback");
 
@@ -305,8 +345,10 @@ void taskLEDCallback()
 }
 
 
-
 void taskT03Callback()
 {
    ;
 }
+
+
+/*  */

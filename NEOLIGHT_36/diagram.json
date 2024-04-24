@@ -1,0 +1,105 @@
+
+{
+  "version": 1,
+  "author": "Willem van Bergen",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-arduino-uno", "id": "uno", "top": 58.2, "left": 105, "attrs": {} },
+    {
+      "type": "wokwi-neopixel",
+      "id": "rgb1",
+      "top": -38.4,
+      "left": 204.3,
+      "rotate": 90,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "rgb2",
+      "top": 326.6,
+      "left": 264.3,
+      "rotate": 270,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "rgb3",
+      "top": 326.6,
+      "left": 293.1,
+      "rotate": 270,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "rgb4",
+      "top": 326.6,
+      "left": 321.9,
+      "rotate": 270,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "rgb5",
+      "top": -38.4,
+      "left": 233.1,
+      "rotate": 90,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "rgb6",
+      "top": -38.4,
+      "left": 261.9,
+      "rotate": 90,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-led-bar-graph",
+      "id": "bargraph1",
+      "top": -43.2,
+      "left": 465.6,
+      "attrs": { "color": "red" }
+    },
+    { "type": "wokwi-gnd", "id": "gnd1", "top": 67.2, "left": 489, "attrs": {} },
+    { "type": "wokwi-logo", "id": "logo1", "top": 288, "left": 144, "attrs": {} },
+    { "type": "wokwi-logic-analyzer", "id": "logic1", "top": 125.15, "left": 480, "attrs": {} }
+  ],
+  "connections": [
+    [ "rgb2:VDD", "rgb3:VDD", "cyan", [ "v19.2", "h28.8" ] ],
+    [ "rgb3:VDD", "rgb4:VDD", "cyan", [ "v19.2", "h28.8" ] ],
+    [ "rgb2:VSS", "rgb3:VSS", "magenta", [ "h-0.9", "v-18.4", "h28.8" ] ],
+    [ "rgb3:VSS", "rgb4:VSS", "magenta", [ "h-0.9", "v-18.4", "h28.8" ] ],
+    [ "rgb3:DIN", "uno:A1", "orange", [ "v-37.6", "h24.9" ] ],
+    [ "rgb2:DIN", "uno:A0", "gold", [ "v-47.2", "h9.6" ] ],
+    [ "rgb4:DIN", "uno:A2", "#8f4814", [ "v-28", "h5.6" ] ],
+    [ "rgb1:VSS", "rgb5:VSS", "magenta", [ "h0.9", "v18.4", "h27.9" ] ],
+    [ "rgb5:VSS", "rgb6:VSS", "magenta", [ "h0.9", "v18.4", "h27.9" ] ],
+    [ "rgb1:VDD", "rgb5:VDD", "cyan", [ "v-19.2", "h28.8" ] ],
+    [ "rgb5:VDD", "rgb6:VDD", "cyan", [ "v-19.2", "h28.8" ] ],
+    [ "rgb6:DIN", "uno:8", "green", [ "v0" ] ],
+    [ "rgb5:DIN", "uno:9", "green", [ "v37.6", "h19.2" ] ],
+    [ "rgb1:DIN", "uno:10", "green", [ "v56.8", "h38.4" ] ],
+    [ "uno:7", "bargraph1:A1", "yellow", [ "v0" ] ],
+    [ "uno:6", "bargraph1:A3", "white", [ "v0" ] ],
+    [ "uno:4", "bargraph1:A7", "gray", [ "v0" ] ],
+    [ "bargraph1:C1", "bargraph1:C2", "green", [ "v0" ] ],
+    [ "bargraph1:C2", "bargraph1:C3", "green", [ "h0" ] ],
+    [ "bargraph1:C3", "bargraph1:C4", "green", [ "h0" ] ],
+    [ "bargraph1:C4", "bargraph1:C5", "green", [ "h0" ] ],
+    [ "bargraph1:C5", "bargraph1:C6", "green", [ "h0" ] ],
+    [ "bargraph1:C6", "bargraph1:C7", "green", [ "h0" ] ],
+    [ "bargraph1:C7", "bargraph1:C8", "green", [ "h0" ] ],
+    [ "bargraph1:C8", "bargraph1:C9", "green", [ "h0" ] ],
+    [ "bargraph1:C9", "bargraph1:C10", "green", [ "h0" ] ],
+    [ "gnd1:GND", "bargraph1:C10", "black", [ "v0" ] ],
+    [ "uno:3", "bargraph1:A9", "violet", [ "v0" ] ],
+    [ "logic1:D0", "bargraph1:A9", "violet", [ "h-28.8", "v-96" ] ],
+    [ "logic1:D1", "bargraph1:A7", "gray", [ "h-38.4", "v-124.8" ] ],
+    [ "logic1:D2", "bargraph1:A3", "white", [ "h-48", "v-172.8", "h-9.6" ] ],
+    [ "logic1:D3", "bargraph1:A1", "yellow", [ "h-57.6", "v-201.6" ] ],
+    [ "logic1:D5", "uno:A2", "#8f4814", [ "h-76.8", "v86.4", "h-76.8" ] ],
+    [ "logic1:D6", "uno:A1", "orange", [ "h-67.2", "v86.4", "h-86.4" ] ],
+    [ "logic1:D7", "uno:A0", "gold", [ "h-57.6", "v86.4", "h-105.6" ] ]
+  ],
+  "dependencies": {}
+}

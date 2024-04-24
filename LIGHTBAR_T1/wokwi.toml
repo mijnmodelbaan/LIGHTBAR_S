@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+firmware = '../.pioenvs/UNO_T1/firmware.hex'
+elf = '../.pioenvs/UNO_T1/firmware.elf'
