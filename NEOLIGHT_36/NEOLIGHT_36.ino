@@ -115,7 +115,7 @@ struct QUEUE
    uint8_t  colorRed    = 255 ;   /*  value Red   color  */
    uint8_t  colorGreen  = 255 ;   /*  value Green color  */
    uint8_t  colorBlue   = 155 ;   /*  value Blue  color  */
-   uint8_t  dimmingFact = 127 ;   /*  a dimming factor   */
+   uint8_t  brightNess  = 127 ;   /*  brightness factor  */
    bool     isEnabled =  true ;   /*  output is in use   */
    bool     nowOn     =  true ;   /*  led is  ON or OFF  */
    // bool     countUp   =  true ;   /*  counting Up or Dn  */
@@ -235,7 +235,7 @@ void notifyCVResetFactoryDefault()
 
 void setup()
 {
-   // noInterrupts();
+   noInterrupts();
 
 
    DDRB  = DDRB  | 0b00111111;  // Set bits B[5-0] as outputs, leave the rest as-is.
@@ -254,6 +254,9 @@ void setup()
    PORTB = PORTB & 0b11000000;  // Switch bits B[5-0] to OFF, leave the rest as-is.
    PORTC = PORTC & 0b11000000;  // Switch bits C[5-0] to OFF, leave the rest as-is.
    PORTD = PORTD & 0b00000111;  // Switch bits D[7-3] to OFF, leave the rest as-is.
+
+
+   interrupts();  /* Ready to rumble....*/
 
 
    // tell FastLED there's 1 NEOPIXEL led on DATA_PIN_0, starting at index 0 in the NEOs array
@@ -365,43 +368,11 @@ void setup()
 
 void loop()
 {
-   // for( int i = 0; i < FastLED.count(); ++i ) {
-   //    NEOs[ i ] = CRGB( 255, 255, 155 );
-   //    if ( i > 3 ) { fadeToBlackBy( &NEOs[ i ], 1, 127 ); }
-   //    FastLED.show();
-      // NEOs[ i ] = CRGB::Black;
-   // }
-
-
-   //  NEOs[ 0 ] = CRGB( led_queue[ 0 ].red, led_queue[ 0 ].green, led_queue[ 0 ].blue );
-   //  NEOs[ 1 ] = CRGB( led_queue[ 1 ].red, led_queue[ 1 ].green, led_queue[ 1 ].blue );
-   //  NEOs[ 2 ] = CRGB( led_queue[ 2 ].red, led_queue[ 2 ].green, led_queue[ 2 ].blue );
-   //  NEOs[ 3 ] = CRGB( led_queue[ 3 ].red, led_queue[ 3 ].green, led_queue[ 3 ].blue );
-   //  NEOs[ 4 ] = CRGB( led_queue[ 4 ].red, led_queue[ 4 ].green, led_queue[ 4 ].blue );
-   //  NEOs[ 5 ] = CRGB( led_queue[ 5 ].red, led_queue[ 5 ].green, led_queue[ 5 ].blue );
-   //  NEOs[ 6 ] = CRGB( led_queue[ 6 ].red, led_queue[ 6 ].green, led_queue[ 6 ].blue );
-   //  FastLED.show();
-
-/*  brightness control  */
-// leds[5] = CRGB::Red;
-// fadeToBlackBy(&leds[5], 1, 127);
-// FastLED.show();
-
-// CHSV _targetHSV = rgb2hsv_approximate(CRGB(red, green, blue)); // choose RGB color
-// //*** OR ***
-// CHSV _targetHSV = rgb2hsv_approximate(leds[0]); // to use the current color of leds[0]
-// _targetHSV.v = value;  // set the brightness 0 -> 100
-// leds[0] = _targetHSV; // update leds[0] with the HSV result
-// FastLED.show(); // show result
-
-// sensVal = constrain(sensVal, 10, 150);  // limits range of sensor values to between 10 and 150
-// x = 9 % 5;  // x now contains 4
-
-
-
    Dcc.process();  /*  Call this process for Dcc connection  */
 
+
    // taskTimer.execute();   /*  Keeps all the timers running...*/
+
 
    if ( foundEom )  /*  Serial Input needs message-handling  */
    {
@@ -434,26 +405,14 @@ void calculateNeoQueue( int ledNumber )
    {
       int getCVNumber = ( ( ledNumber + 4 ) * 10 ) ;  /*  calculate the correct CVaddress  */
 
-      NEO_queue[ ledNumber ].colorRed    = constrain( Dcc.getCV( getCVNumber + 1 ), 0, 255 );
-      NEO_queue[ ledNumber ].colorGreen  = constrain( Dcc.getCV( getCVNumber + 2 ), 0, 255 );
-      NEO_queue[ ledNumber ].colorBlue   = constrain( Dcc.getCV( getCVNumber + 3 ), 0, 255 );
-      NEO_queue[ ledNumber ].dimmingFact = constrain( Dcc.getCV( getCVNumber + 4 ), 0, 255 );
-
-
-
-
-   //    led_queue[ ledNumber ].outputState = Dcc.getCV( getCVNumber ) ;
-
-   //    unsigned long hInterval = Dcc.getCV( getCVNumber + 1 ) * Dcc.getCV( getCVNumber + 2 ) ;
-   //    // igned long lInterval = Dcc.getCV( getCVNumber + 3 ) * Dcc.getCV( getCVNumber + 4 ) ;
-
-   //    led_queue[ ledNumber ].highCount = Dcc.getCV( getCVNumber + 5 ) * Dcc.getCV( getCVNumber + 6 );
-   //    led_queue[ ledNumber ].lowCount  = Dcc.getCV( getCVNumber + 7 ) * Dcc.getCV( getCVNumber + 8 );
-
-   //    led_queue[ ledNumber ].cntValue = led_queue[ ledNumber ].highCount ;
+      NEO_queue[ ledNumber ].colorRed   = constrain( Dcc.getCV( getCVNumber + 1 ), 0, 255 );
+      NEO_queue[ ledNumber ].colorGreen = constrain( Dcc.getCV( getCVNumber + 2 ), 0, 255 );
+      NEO_queue[ ledNumber ].colorBlue  = constrain( Dcc.getCV( getCVNumber + 3 ), 0, 255 );
+      NEO_queue[ ledNumber ].brightNess = constrain( Dcc.getCV( getCVNumber + 4 ), 0, 255 );
 
       NEOs[ ledNumber ] = CRGB( NEO_queue[ ledNumber ].colorRed, NEO_queue[ ledNumber ].colorGreen, NEO_queue[ ledNumber ].colorBlue );
-      fadeToBlackBy( &NEOs[ ledNumber ], 1, NEO_queue[ ledNumber ].dimmingFact );
+
+      nscale8x3_video( NEOs[ ledNumber ].r, NEOs[ ledNumber ].g, NEOs[ ledNumber ].b, NEO_queue[ ledNumber ].brightNess );
 
 
       _PP( " cv: " );
@@ -477,13 +436,10 @@ void calculateNeoQueue( int ledNumber )
       _PP( " value: " );
       _2L( Dcc.getCV( getCVNumber + 4 ), DEC );
 
-
       _PL(F( "-------------------------------------" ));
-
    }
    else
    {
-      // NEO_queue[ ledNumber ].nowOn = false;
       NEOs[ ledNumber ] = CRGB::Black;
    }
 
@@ -584,12 +540,12 @@ void parseCom( char *com )
 /*
  *    clears settings to Factory Defaults
  *
- *    returns: <FD done cvCheck>
+ *    returns: <FD done> cvCheck
  */
       {
          uint8_t cvCheck = Dcc.setCV( NMRADCC_MASTER_RESET_CV, NMRADCC_MASTER_RESET_CV );
 
-         _PP( "\t"  "<FD done>"  "\t" );
+         _PP( "<FD done>"  );
          _2L( cvCheck, DEC );
 
          softwareReset(  WDTO_15MS  );
@@ -638,7 +594,7 @@ void parseCom( char *com )
 
          if( sscanf( com + 2, "%d", &fv ) != 1 ) { return; }  /*  get value and check for valid number  */
 
-         switch ( fv )  /*  F0 to F12  */
+         switch ( fv )  /*  F0 to F6  */
          {
 
             case  0:
@@ -662,7 +618,7 @@ void parseCom( char *com )
                break;
             }
 
-            case  7:
+            case  7:  /*  F7 to F12  */
             case  8:
             case  9:
             case 10:
@@ -671,7 +627,6 @@ void parseCom( char *com )
             default:
                break;
          }
-
 
          cvCheck = Dcc.getCV( 40 + ( fv * 10 ) );
 
@@ -704,11 +659,11 @@ void parseCom( char *com )
 
          uint8_t cvCheck = Dcc.getCV( cv );
 
-         _PP( "<r " );
+         _PP( "<r "        );
          _2P( cv + 0 , DEC );
-         _PP( " "   );
+         _PP( " "          );
          _2P( cvCheck, DEC );
-         _PL( ">"   );
+         _PL( ">"          );
 
          break;
       }
@@ -741,11 +696,11 @@ void parseCom( char *com )
 
 /*  TODO: here we still need the calculation for the LEDs  */
 
-         _PP( "<w " );
+         _PP( "<w "        );
          _2P( cv + 0 , DEC );
-         _PP( " "   );
+         _PP( " "          );
          _2P( cvCheck, DEC );
-         _PL( ">"   );
+         _PL( ">"          );
 
          break;
       }
@@ -772,6 +727,247 @@ void parseCom( char *com )
          break;
    }
 }
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/************************************************************************************
+                        Call-back functions from DCC
+************************************************************************************/
+
+/*  TODO:  some of the following functions can be removed after testing with DCC  */
+
+
+void    notifyDccAccTurnoutBoard (uint16_t BoardAddr, uint8_t OutputPair, uint8_t Direction, uint8_t OutputPower)
+{
+            _PL("notifyDccAccTurnoutBoard");
+}
+
+void    notifyDccAccTurnoutOutput (uint16_t Addr, uint8_t Direction, uint8_t OutputPower)
+{
+            _PL("notifyDccAccTurnoutOutput");
+}
+
+
+void    notifyDccAccBoardAddrSet (uint16_t BoardAddr)
+{
+            _PL("notifyDccAccBoardAddrSet");
+}
+
+void    notifyDccAccOutputAddrSet (uint16_t Addr)
+{
+            _PL("notifyDccAccOutputAddrSet");
+}
+
+
+void    notifyDccSigOutputState (uint16_t Addr, uint8_t State)
+{
+            _PL("notifyDccSigOutputState");
+}
+
+void    notifyDccMsg (DCC_MSG * Msg)
+{
+            _PL("notifyDccMsg");
+}
+
+
+// Deprecated, only for backward compatibility with version 1.4.2.
+// Don't use in new designs. These functions may be dropped in future versions
+void notifyDccAccState (uint16_t Addr, uint16_t BoardAddr, uint8_t OutputAddr, uint8_t State)
+{
+            _PL("notifyDccAccState");
+}
+
+void notifyDccSigState (uint16_t Addr, uint8_t OutputIndex, uint8_t State)
+{
+            _PL("notifyDccSigState");
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+/* **********************************************************************************
+    notifyCVChange()  Called when a CV value is changed.
+                      This is called whenever a CV's value is changed.
+    notifyDccCVChange()  Called only when a CV value is changed by a Dcc packet or a lib function.
+                      it is NOT called if the CV is changed by means of the setCV() method.
+                      Note: It is not called if notifyCVWrite() is defined
+                      or if the value in the EEPROM is the same as the value
+                      in the write command.
+
+    Inputs:
+      CV        - CV number.
+      Value     - Value of the CV.
+
+    Returns:
+      None
+*/
+void    notifyCVChange( uint16_t CV, uint8_t Value )
+{
+   _PP( "notifyCVChange: CV: " );
+   _2L( CV,                DEC );
+   _PP( "Value: "              );
+   _2L( Value,             DEC );
+
+   if ( ( ( CV == 251 ) && ( Value == 251 ) ) || ( ( CV == 252 ) && ( Value == 252 ) ) )
+   {
+      wdt_enable( WDTO_15MS );  //  Resets after 15 milliSecs
+
+      while ( 1 ) {} // Wait for the prescaler time to expire
+   }
+
+   /*  calculate the time setting for almost every output  */
+   for(int i = 0; i < FastLED.count(); ++i )
+   {
+      calculateNeoQueue( i );
+   }
+
+}       //   end notifyCVChange()
+
+
+/* **********************************************************************************
+      notifyDccFunc() Callback for a multifunction decoder function command.
+
+    Inputs:
+      Addr        - Active decoder address.
+      AddrType    - DCC_ADDR_SHORT or DCC_ADDR_LONG.
+      FuncGrp     - Function group. FN_0      - 14 speed headlight  Mask FN_BIT_00
+
+                                    FN_0_4    - Functions  0 to  4. Mask FN_BIT_00 - FN_BIT_04
+                                    FN_5_8    - Functions  5 to  8. Mask FN_BIT_05 - FN_BIT_08
+                                    FN_9_12   - Functions  9 to 12. Mask FN_BIT_09 - FN_BIT_12
+                                    FN_13_20  - Functions 13 to 20. Mask FN_BIT_13 - FN_BIT_20
+                                    FN_21_28  - Functions 21 to 28. Mask FN_BIT_21 - FN_BIT_28
+      FuncState   - Function state. Bitmask where active functions have a 1 at that bit.
+                                    You must &FuncState with the appropriate
+                                    FN_BIT_nn value to isolate a given bit.
+
+    Returns:
+      None
+*/
+void notifyDccFunc( uint16_t Addr, DCC_ADDR_TYPE AddrType, FN_GROUP FuncGrp, uint8_t FuncState )
+{
+   _PL( "notifyDccFunc" );
+   _PP( "Address = "    );
+   _2L( Addr,        DEC);
+   _PP( "AddrType = "   );
+   _2L( AddrType,    DEC);
+   _PP( "FuncGrp = "    );
+   _2L( FuncGrp,     DEC);
+   _PP( "FuncState = "  );
+   _2L( FuncState,   DEC);
+
+  switch ( FuncGrp )
+  {
+    case FN_0_4:    //  Function Group 1    F0 F4 F3 F2 F1
+    {
+      //   exec_function(  0, DATA_PIN_0, ( FuncState & FN_BIT_00 ) >> 4 );
+      //   exec_function(  1, FunctionPinDum, ( FuncState & FN_BIT_01 ) >> 0 );
+      //   exec_function(  2, FunctionPinDum, ( FuncState & FN_BIT_02 ) >> 1 );
+      //   exec_function(  3, FunctionPinDum, ( FuncState & FN_BIT_03 ) >> 2 );
+      //   exec_function(  4, FunctionPinDum, ( FuncState & FN_BIT_04 ) >> 3 );
+        break ;
+    }
+
+    case FN_5_8:    //  Function Group 1    F8  F7  F6  F5
+    {
+      //   exec_function(  5, FunctionPinDum, ( FuncState & FN_BIT_05 ) >> 0 );
+      //   exec_function(  6, FunctionPinDum, ( FuncState & FN_BIT_06 ) >> 1 );
+      //   exec_function(  7, FunctionPinDum, ( FuncState & FN_BIT_07 ) >> 2 );
+      //   exec_function(  8, FunctionPinDum, ( FuncState & FN_BIT_08 ) >> 3 );
+        break ;
+    }
+    case FN_9_12:   //  Function Group 1    F12 F11 F10 F9
+    {
+      //   exec_function(  9, FunctionPinDum, ( FuncState & FN_BIT_09 ) >> 0 );
+      //   exec_function( 10, FunctionPinDum, ( FuncState & FN_BIT_10 ) >> 1 );
+      //   exec_function( 11, FunctionPinDum, ( FuncState & FN_BIT_11 ) >> 2 );
+      //   exec_function( 12, FunctionPinDum, ( FuncState & FN_BIT_12 ) >> 3 );
+        break ;
+    }
+    case FN_13_20:  //  Function Group 2  ==  F20 - F13
+    case FN_21_28:  //  Function Group 2  ==  F28 - F21
+    default:
+      {
+        break ;
+      }
+  }
+}                     //  End notifyDccFunc()
+
+
+/* **********************************************************************************
+ *  notifyDccSpeed() Callback for a multifunction decoder speed command.
+ *                   The received speed and direction are unpacked to separate values.
+ *
+ *  Inputs:
+ *    Addr        - Active decoder address.
+ *    AddrType    - DCC_ADDR_SHORT or DCC_ADDR_LONG.
+ *    Speed       - Decoder speed. 0               = Emergency stop
+ *                                 1               = Regular stop
+ *                                 2 to SpeedSteps = Speed step 1 to max.
+ *    Dir         - DCC_DIR_REV or DCC_DIR_FWD
+ *    SpeedSteps  - Highest speed, SPEED_STEP_14   =  15
+ *                                 SPEED_STEP_28   =  29
+ *                                 SPEED_STEP_128  = 127
+ *
+ *  Returns:
+ *    None
+ */
+void    notifyDccSpeed( uint16_t Addr, DCC_ADDR_TYPE AddrType, uint8_t Speed, DCC_DIRECTION Direction, DCC_SPEED_STEPS SpeedSteps )
+{
+    _PL("notifyDccSpeed  and  DCC_DIRECTION");
+    
+    _PP( "Address = "    );
+    _2L( Addr,        DEC);
+    _PP( "AddrType = "   );
+    _2L( AddrType,    DEC);
+    _PP( "Speed = "      );
+    _2L( Speed,       DEC);
+    _PP( "Direction = "  );
+    _2L( Direction,   DEC);
+    _PP( "SpeedSteps = " );
+    _2L( SpeedSteps, DEC );
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+void exec_function ( int function, int pin, int FuncState )
+{
+   _PP( "exec_function = " );
+   _2L( function,      DEC );
+   _PP( "pin (n/u) = "     );
+   _2L( pin,           DEC );
+   _PP( "FuncState = "     );
+   _2L( FuncState,     DEC );
+
+  switch ( Dcc.getCV( 40 + function ) )
+  {
+    case  0:  // Function  F0
+    case  1:
+    case  2:
+    case  3:
+    case  4:
+    case  5:
+    case  6:
+    case  7:
+    case  8:
+    case  9:
+    case 10:  // Function F10
+      {
+      //   function_value[ function ] = byte( FuncState );
+        break ;
+      }
+
+    default:
+      {
+        break ;
+      }
+  }
+}                //  End exec_function()
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
