@@ -41,7 +41,7 @@ DCC_MSG  Packet ;
 
 #include <FastLED.h>
 
-#define DATA_PIN_0   5   /*  Which pin on the Arduino is connected to NEO 0  */
+#define DATA_PIN_0   5   /*  Which pin on the Arduino is connected to DUMMY  */
 
 #define DATA_PIN_1  14   /*  Which pin on the Arduino is connected to NEO 1  */
 #define DATA_PIN_2  15   /*  Which pin on the Arduino is connected to NEO 2  */
@@ -111,20 +111,31 @@ bool run_switch_set[ ] = { false, true, true, true, true, true, true, true, true
 
 struct QUEUE
 {
-   uint8_t  outputState =   0 ;   /*  0, 1 or 2 status   */
-   uint8_t  colorRed    = 255 ;   /*  value Red   color  */
-   uint8_t  colorGreen  = 255 ;   /*  value Green color  */
-   uint8_t  colorBlue   = 155 ;   /*  value Blue  color  */
-   uint8_t  brightNess  = 127 ;   /*  brightness factor  */
-   bool     isEnabled =  true ;   /*  output is in use   */
-   bool     nowOn     =  true ;   /*  led is  ON or OFF  */
+   uint8_t        outputState    =     0 ;   /*  0, 1 or ?? status  */
+   uint8_t        colorRed       =   255 ;   /*  value Red   color  */
+   uint8_t        colorGreen     =   255 ;   /*  value Green color  */
+   uint8_t        colorBlue      =   155 ;   /*  value Blue  color  */
+   uint8_t        brightNess     =   127 ;   /*  brightness factor  */
+   bool           isEnabled      =  true ;   /*  output is in use   */
+   bool           isBlinking     = false ;   /*  output is blinker  */
+   unsigned long  blinkOnTime    =     0 ;   /*  millisec  ON time  */
+   unsigned long  blinkOffTime   =     0 ;   /*  millisec OFF time  */
+   unsigned long  startMillies   =     0 ;   /*  cycle starttime    */
+   unsigned long  currentPeriod  =     0 ;   /*  run time of cycle  */
+   bool           nowOn          =  true ;   /*  led is  ON or OFF  */
+
+
+   // #define  runEvery( n ) for ( static unsigned long lasttime; millis() - lasttime > ( unsigned long )( n ); lasttime = millis() )
+   // example: runEvery( time )  { welder2_on = random( 25, 47 ); welder2_delta = random( 22, 125 ); }
+   // see IDEC_WELDRER  loop()  function for examples
+
+
    // bool     countUp   =  true ;   /*  counting Up or Dn  */
    // long     cntValue  =  1255 ;   /*  countdown to zero  */
    // long     highCount =  1255 ;   /*  pulses high count  */
    // long     lowCount  =  1255 ;   /*  pulses  low count  */
 };
 QUEUE volatile *NEO_queue = new QUEUE[ ( NUM_STRIPS * NUM_NEOS ) + 1 ];   /*  one extra for F0 function  */
-
 
 
 struct CVPair
@@ -155,21 +166,21 @@ CVPair FactoryDefaultCVs [] =
    {  42, 255},
    {  43, 155},
    {  44, 127},
-   {  45,   0},
-   {  46,   0},
-   {  47,   0},
-   {  48,   0},
-   {  49,   0},
+   {  45,  10},   /*  fade up time  multiplier  */
+   {  46,  10},   /*  fade down     multiplier  */
+   {  47,  10},   /*  blinking  ON  multiplier  */
+   {  48,  10},   /*  blinking OFF  multiplier  */
+   {  49,   0},   /*    */
 
    {  50,   1},  /*  0 = disabled - 1 = normal - 2 = blinking >> NEO   F1  */
    {  51, 255},  /*  color value  red  channel  */
    {  52, 255},  /*  color value green channel  */
    {  53, 155},  /*  color value blue  channel  */
    {  54, 127},  /*  dimming factor of channel  */
-   {  55,   0},  /*  fade-up time  ms  setting  */
-   {  56,   0},  /*  fade-up time   multiplier  */
-   {  57,   0},  /*  fade-down time   setting   */
-   {  58,   0},  /*  fade-down time multiplier  */
+   {  55,   0},  /*  fade-up   time    setting  */
+   {  56,   0},  /*  fade-down time    setting  */
+   {  57,  40},  /*  blinking  ON time setting  */
+   {  58,  60},  /*  blinking OFF time setting  */
    {  59,   0},  /*    */
 
    {  60,   1},  /*  0 = disabled - 1 = normal - 2 = blinking >> NEO   F2  */
@@ -260,10 +271,10 @@ void setup()
 
 
    // tell FastLED there's 1 NEOPIXEL led on DATA_PIN_0, starting at index 0 in the NEOs array
-   FastLED.addLeds<WS2812B, DATA_PIN_0, GRB>( NEOs,  0, NUM_NEOS );
+   FastLED.addLeds<WS2812B, DATA_PIN_0, GRB>( NEOs,  0, NUM_NEOS );  /*  DUMMY  */
 
    // tell FastLED there's 1 NEOPIXEL led on DATA_PIN_1, starting at index 1 in the NEOs array
-   FastLED.addLeds<WS2812B, DATA_PIN_1, GRB>( NEOs,  1, NUM_NEOS );
+   FastLED.addLeds<WS2812B, DATA_PIN_1, GRB>( NEOs,  1, NUM_NEOS );  /*  F1  */
 
    // tell FastLED there's 1 NEOPIXEL led on DATA_PIN_2, starting at index 2 in the NEOs array
    FastLED.addLeds<WS2812B, DATA_PIN_2, GRB>( NEOs,  2, NUM_NEOS );
@@ -346,9 +357,7 @@ void setup()
 
 
 
-   // _PL(F( "***   TaskScheduler has Started   ***" ));
    _PL(F( "-------------------------------------" ));
-
 
 
    /*  calculate the settings for every output at startup  */
@@ -358,7 +367,39 @@ void setup()
    }
 
 
-   displayText(); /* Shows the standard text. */
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+   // uint8_t        outputState    =     0 ;   /*  0, 1 or ?? status  */
+   // uint8_t        colorRed       =   255 ;   /*  value Red   color  */
+   // uint8_t        colorGreen     =   255 ;   /*  value Green color  */
+   // uint8_t        colorBlue      =   155 ;   /*  value Blue  color  */
+   // uint8_t        brightNess     =   127 ;   /*  brightness factor  */
+   // bool           isEnabled      =  true ;   /*  output is in use   */
+   // bool           isBlinking     = false ;   /*  output is blinker  */
+   // unsigned long  blinkOnTime    =     0 ;   /*  millisec  ON time  */
+   // unsigned long  blinkOffTime   =     0 ;   /*  millisec OFF time  */
+   // unsigned long  startMillies   =     0 ;   /*  cycle starttime    */
+   // unsigned long  currentPeriod  =     0 ;   /*  run time of cycle  */
+   // bool           nowOn          =  true ;   /*  led is  ON or OFF  */
+
+
+   NEO_queue[ 4 ].isBlinking = true;
+   NEO_queue[ 4 ].nowOn      = true;
+
+   NEO_queue[ 4 ].blinkOffTime = 1500;
+   NEO_queue[ 4 ].blinkOnTime  =  500;
+
+   NEO_queue[ 6 ].isBlinking = true;
+   NEO_queue[ 6 ].nowOn      = true;
+
+   NEO_queue[ 6 ].blinkOffTime = 150;
+   NEO_queue[ 6 ].blinkOnTime  =  50;
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+   displayText(); /* Shows the standard text if applicable */
 
 
    interrupts();  /* Ready to rumble....*/
@@ -366,9 +407,43 @@ void setup()
 }
 
 
+
+byte indexOne = 0;
+unsigned long currentMillis = 0;
+
+
+
 void loop()
 {
-   Dcc.process();  /*  Call this process for Dcc connection  */
+   Dcc.process();  /*  Call this process for a Dcc connection  */
+
+
+   currentMillis = millis();  /*  lets keep track of the time  */
+
+   if ( run_switch_set[ indexOne ] && NEO_queue[ indexOne ].isBlinking )   /*  check if valid to run  */
+   {
+      if ( currentMillis - NEO_queue[ indexOne ].startMillies >= NEO_queue[ indexOne ].currentPeriod )
+      {
+         NEO_queue[ indexOne ].startMillies = currentMillis;
+
+         NEO_queue[ indexOne ].nowOn = !NEO_queue[ indexOne ].nowOn;
+
+         calculateNeoBlink( indexOne );
+
+         if ( NEO_queue[ indexOne ].nowOn )
+         {
+            NEO_queue[ indexOne ].currentPeriod = NEO_queue[ indexOne ].blinkOnTime;
+         }
+         else
+         {
+            NEO_queue[ indexOne ].currentPeriod = NEO_queue[ indexOne ].blinkOffTime;
+         }
+      }
+   }
+
+
+
+   indexOne = ( indexOne + 1 ) % 11; /*  index form 0 to 10  */
 
 
    // taskTimer.execute();   /*  Keeps all the timers running...*/
@@ -405,6 +480,9 @@ void calculateNeoQueue( int ledNumber )
    {
       int getCVNumber = ( ( ledNumber + 4 ) * 10 ) ;  /*  calculate the correct CVaddress  */
 
+
+/*  TODO: check if we REALLY need the colorRed, colorGreen and colorBlue in the NEO_queue  */
+
       NEO_queue[ ledNumber ].colorRed   = constrain( Dcc.getCV( getCVNumber + 1 ), 0, 255 );
       NEO_queue[ ledNumber ].colorGreen = constrain( Dcc.getCV( getCVNumber + 2 ), 0, 255 );
       NEO_queue[ ledNumber ].colorBlue  = constrain( Dcc.getCV( getCVNumber + 3 ), 0, 255 );
@@ -412,7 +490,9 @@ void calculateNeoQueue( int ledNumber )
 
       NEOs[ ledNumber ] = CRGB( NEO_queue[ ledNumber ].colorRed, NEO_queue[ ledNumber ].colorGreen, NEO_queue[ ledNumber ].colorBlue );
 
-      nscale8x3_video( NEOs[ ledNumber ].r, NEOs[ ledNumber ].g, NEOs[ ledNumber ].b, NEO_queue[ ledNumber ].brightNess );
+      NEOs[ ledNumber ].nscale8_video( NEO_queue[ ledNumber ].brightNess );
+      // nscale8x3_video( NEOs[ ledNumber ].r, NEOs[ ledNumber ].g, NEOs[ ledNumber ].b, NEO_queue[ ledNumber ].brightNess );
+      // cleanup_R1();
 
 
       _PP( " cv: " );
@@ -437,6 +517,36 @@ void calculateNeoQueue( int ledNumber )
       _2L( Dcc.getCV( getCVNumber + 4 ), DEC );
 
       _PL(F( "-------------------------------------" ));
+   }
+   else
+   {
+      NEOs[ ledNumber ] = CRGB::Black;
+   }
+
+   FastLED.show();   /*  Show all the NEOs, changed or not  */
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+void calculateNeoBlink( int ledNumber )
+{
+   if ( run_switch_set[ 0 ] && NEO_queue[ ledNumber ].isEnabled && NEO_queue[ ledNumber ].nowOn )
+   {
+//       int getCVNumber = ( ( ledNumber + 4 ) * 10 ) ;  /*  calculate the correct CVaddress  */
+
+
+// /*  TODO: check if we REALLY need the colorRed, colorGreen and colorBlue in the NEO_queue  */
+
+//       NEO_queue[ ledNumber ].colorRed   = constrain( Dcc.getCV( getCVNumber + 1 ), 0, 255 );
+//       NEO_queue[ ledNumber ].colorGreen = constrain( Dcc.getCV( getCVNumber + 2 ), 0, 255 );
+//       NEO_queue[ ledNumber ].colorBlue  = constrain( Dcc.getCV( getCVNumber + 3 ), 0, 255 );
+//       NEO_queue[ ledNumber ].brightNess = constrain( Dcc.getCV( getCVNumber + 4 ), 0, 255 );
+
+      NEOs[ ledNumber ] = CRGB( NEO_queue[ ledNumber ].colorRed, NEO_queue[ ledNumber ].colorGreen, NEO_queue[ ledNumber ].colorBlue );
+
+      NEOs[ ledNumber ].nscale8_video( NEO_queue[ ledNumber ].brightNess );
    }
    else
    {
@@ -590,7 +700,7 @@ void parseCom( char *com )
  *    where VALUE is a number from 0-1 as read from the requested FV, or -1 if verificaiton fails
  */
       {
-         int  fv, cvCheck;
+         int  fv;  /* , cvCheck;  */
 
          if( sscanf( com + 2, "%d", &fv ) != 1 ) { return; }  /*  get value and check for valid number  */
 
@@ -628,13 +738,11 @@ void parseCom( char *com )
                break;
          }
 
-         cvCheck = Dcc.getCV( 40 + ( fv * 10 ) );
+         // cvCheck = Dcc.getCV( 40 + ( fv * 10 ) );
 
          _PL(F( "wait for the cycle to end..." ) );
          _PP(F( "<f F"                         ) );
-         _2P(   fv + 0 ,                   DEC )  ;
-         _PP(F( " "                            ) );
-         _2P(   cvCheck,                   DEC )  ;
+         _2P(   fv + 0 ,                   DEC   );
          _PL(F( ">"                            ) );
 
          break;
