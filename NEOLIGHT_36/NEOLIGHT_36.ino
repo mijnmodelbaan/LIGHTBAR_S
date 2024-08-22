@@ -52,7 +52,6 @@ DCC_MSG  Packet ;
 
 #define NUM_NEOS     1   /*  How many NEOs are attached to each output pin   */
 #define NUM_STRIPS   6   /*  How many strips are attached to the processor   */
-#define BRIGHTNESS  99   /*  LED brightness, 0 (min) to 255 (max)            */
 
 CRGB NEOs[ ( NUM_STRIPS * NUM_NEOS ) + 1 ];   /*  one extra for F0 function  */
 
@@ -63,6 +62,8 @@ CRGB NEOs[ ( NUM_STRIPS * NUM_NEOS ) + 1 ];   /*  one extra for F0 function  */
 #define DATA_PIN_B   4   /*  Which pin on the Arduino is connected to LED B  */
 #define DATA_PIN_C   6   /*  Which pin on the Arduino is connected to LED C  */
 #define DATA_PIN_D   7   /*  Which pin on the Arduino is connected to LED D  */
+
+#define BRIGHTNESS  99   /*  LED brightness, 0 (min) to 255 (max)            */
 
 uint8_t LEDs[4] = { DATA_PIN_A, DATA_PIN_B, DATA_PIN_C, DATA_PIN_D };
 
@@ -120,22 +121,16 @@ struct QUEUE
    bool           isBlinking     = false ;   /*  output is blinker  */
    unsigned long  blinkOnTime    =     0 ;   /*  millisec  ON time  */
    unsigned long  blinkOffTime   =     0 ;   /*  millisec OFF time  */
-   unsigned long  startMillies   =     0 ;   /*  cycle starttime    */
-   unsigned long  currentPeriod  =     0 ;   /*  run time of cycle  */
+   unsigned long  blinkMillies   =     0 ;   /*  blink cycle start  */
+   unsigned long  blinkPeriod    =     0 ;   /*  run time of cycle  */
+   bool           isFading       = false ;   /*  output is a fader  */
+   unsigned long  fadingOnTime   =     0 ;   /*  millisec fade  ON  */
+   unsigned long  fadingOffTime  =     0 ;   /*  millisec fade OFF  */
+   unsigned long  fadingMillies  =     0 ;   /*  fade cycle  start  */
+   unsigned long  fadingPeriod   =     0 ;   /*  run time of cycle  */
    bool           nowOn          =  true ;   /*  led is  ON or OFF  */
-
-
-   // #define  runEvery( n ) for ( static unsigned long lasttime; millis() - lasttime > ( unsigned long )( n ); lasttime = millis() )
-   // example: runEvery( time )  { welder2_on = random( 25, 47 ); welder2_delta = random( 22, 125 ); }
-   // see IDEC_WELDRER  loop()  function for examples
-
-
-   // bool     countUp   =  true ;   /*  counting Up or Dn  */
-   // long     cntValue  =  1255 ;   /*  countdown to zero  */
-   // long     highCount =  1255 ;   /*  pulses high count  */
-   // long     lowCount  =  1255 ;   /*  pulses  low count  */
 };
-QUEUE volatile *NEO_queue = new QUEUE[ ( NUM_STRIPS * NUM_NEOS ) + 1 ];   /*  one extra for F0 function  */
+QUEUE volatile *NEO_queue = new QUEUE[ ( NUM_STRIPS * NUM_NEOS ) + sizeof( LEDs ) + 1 ];   /*  one extra for F0 function  */
 
 
 struct CVPair
@@ -177,10 +172,10 @@ CVPair FactoryDefaultCVs [] =
    {  52, 255},  /*  color value green channel  */
    {  53, 155},  /*  color value blue  channel  */
    {  54, 127},  /*  dimming factor of channel  */
-   {  55,   0},  /*  fade-up   time    setting  */
-   {  56,   0},  /*  fade-down time    setting  */
-   {  57,  40},  /*  blinking  ON time setting  */
-   {  58,  60},  /*  blinking OFF time setting  */
+   {  55,   0},  /*  blinking  ON time setting  */
+   {  56,   0},  /*  blinking OFF time setting  */
+   {  57,  40},  /*  fade-up   time    setting  */
+   {  58,  60},  /*  fade-down time    setting  */
    {  59,   0},  /*    */
 
    {  60,   1},  /*  0 = disabled - 1 = normal - 2 = blinking >> NEO   F2  */
@@ -188,10 +183,10 @@ CVPair FactoryDefaultCVs [] =
    {  62, 255},  /*  color value green channel  */
    {  63, 155},  /*  color value blue  channel  */
    {  64, 127},  /*  dimming factor of channel  */
-   {  65,   0},  /*  fade-up time  ms  setting  */
-   {  66,   0},  /*  fade-up time   multiplier  */
-   {  67,   0},  /*  fade-down time   setting   */
-   {  68,   0},  /*  fade-down time multiplier  */
+   {  65,   0},  /*  blinking  ON time setting  */
+   {  66,   0},  /*  blinking OFF time setting  */
+   {  67,   0},  /*  fade-up   time    setting  */
+   {  68,   0},  /*  fade-down time    setting  */
    {  69,   0},  /*    */
 
    {  70,   1},  /*  0 = disabled - 1 = normal - 2 = blinking >> NEO   F3  */
@@ -199,27 +194,99 @@ CVPair FactoryDefaultCVs [] =
    {  72, 255},  /*  color value green channel  */
    {  73, 155},  /*  color value blue  channel  */
    {  74, 127},  /*  dimming factor of channel  */
+   {  75,   0},  /*  blinking  ON time setting  */
+   {  76,   0},  /*  blinking OFF time setting  */
+   {  77,   0},  /*  fade-up   time    setting  */
+   {  78,   0},  /*  fade-down time    setting  */
+   {  79,   0},  /*    */
 
    {  80,   1},  /*  0 = disabled - 1 = normal - 2 = blinking >> NEO   F4  */
    {  81, 255},  /*  color value  red  channel  */
    {  82, 255},  /*  color value green channel  */
    {  83, 155},  /*  color value blue  channel  */
    {  84, 127},  /*  dimming factor of channel  */
+   {  85,   0},  /*  blinking  ON time setting  */
+   {  86,   0},  /*  blinking OFF time setting  */
+   {  87,   0},  /*  fade-up   time    setting  */
+   {  88,   0},  /*  fade-down time    setting  */
+   {  89,   0},  /*    */
 
    {  90,   1},  /*  0 = disabled - 1 = normal - 2 = blinking >> NEO   F5  */
    {  91, 255},  /*  color value  red  channel  */
    {  92, 255},  /*  color value green channel  */
    {  93, 155},  /*  color value blue  channel  */
    {  94, 127},  /*  dimming factor of channel  */
+   {  95,   0},  /*  blinking  ON time setting  */
+   {  96,   0},  /*  blinking OFF time setting  */
+   {  97,   0},  /*  fade-up   time    setting  */
+   {  98,   0},  /*  fade-down time    setting  */
+   {  99,   0},  /*    */
 
    { 100,   1},  /*  0 = disabled - 1 = normal - 2 = blinking >> NEO   F6  */
    { 101, 255},  /*  color value  red  channel  */
    { 102, 255},  /*  color value green channel  */
    { 103, 155},  /*  color value blue  channel  */
    { 104, 127},  /*  dimming factor of channel  */
+   { 105,   0},  /*  blinking  ON time setting  */
+   { 106,   0},  /*  blinking OFF time setting  */
+   { 107,   0},  /*  fade-up   time    setting  */
+   { 108,   0},  /*  fade-down time    setting  */
+   { 109,   0},  /*    */
 
+   { 110,   1},  /*  0 = disabled - 1 = normal - 2 = blinking >> LED   F7  */
+   { 111, 255},  /*  color value  red  channel  */
+   { 112, 255},  /*  color value green channel  */
+   { 113, 155},  /*  color value blue  channel  */
+   { 114, 127},  /*  dimming factor of channel  */
+   { 115,   0},  /*  blinking  ON time setting  */
+   { 116,   0},  /*  blinking OFF time setting  */
+   { 117,   0},  /*  fade-up   time    setting  */
+   { 118,   0},  /*  fade-down time    setting  */
+   { 119,   0},  /*    */
 
+   { 120,   1},  /*  0 = disabled - 1 = normal - 2 = blinking >> NEO   F8  */
+   { 121, 255},  /*  color value  red  channel  */
+   { 122, 255},  /*  color value green channel  */
+   { 123, 155},  /*  color value blue  channel  */
+   { 124, 127},  /*  dimming factor of channel  */
+   { 125,   0},  /*  blinking  ON time setting  */
+   { 126,   0},  /*  blinking OFF time setting  */
+   { 127,   0},  /*  fade-up   time    setting  */
+   { 128,   0},  /*  fade-down time    setting  */
+   { 129,   0},  /*    */
 
+   { 130,   1},  /*  0 = disabled - 1 = normal - 2 = blinking >> NEO   F9  */
+   { 131, 255},  /*  color value  red  channel  */
+   { 132, 255},  /*  color value green channel  */
+   { 133, 155},  /*  color value blue  channel  */
+   { 134, 127},  /*  dimming factor of channel  */
+   { 135,   0},  /*  blinking  ON time setting  */
+   { 136,   0},  /*  blinking OFF time setting  */
+   { 137,   0},  /*  fade-up   time    setting  */
+   { 138,   0},  /*  fade-down time    setting  */
+   { 139,   0},  /*    */
+
+   { 140,   1},  /*  0 = disabled - 1 = normal - 2 = blinking >> NEO  F10  */
+   { 141, 255},  /*  color value  red  channel  */
+   { 142, 255},  /*  color value green channel  */
+   { 143, 155},  /*  color value blue  channel  */
+   { 144, 127},  /*  dimming factor of channel  */
+   { 145,   0},  /*  blinking  ON time setting  */
+   { 146,   0},  /*  blinking OFF time setting  */
+   { 147,   0},  /*  fade-up   time    setting  */
+   { 148,   0},  /*  fade-down time    setting  */
+   { 149,   0},  /*    */
+
+   { 150,   0},  /*  0 = disabled - 1 = normal - 2 = blinking >> NEO  F11  */
+   { 151,   0},  /*  color value  red  channel  */
+   { 152,   0},  /*  color value green channel  */
+   { 153,   0},  /*  color value blue  channel  */
+   { 154,   0},  /*  dimming factor of channel  */
+   { 155,   0},  /*  blinking  ON time setting  */
+   { 156,   0},  /*  blinking OFF time setting  */
+   { 157,   0},  /*  fade-up   time    setting  */
+   { 158,   0},  /*  fade-down time    setting  */
+   { 159,   0},  /*    */
 
 
    { 251,   0},  /*  NMRADCC_SIMPLE_RESET_CV  */
@@ -350,20 +417,18 @@ void setup()
    SoftPWMBegin( SOFTPWM_NORMAL );     /*  Initialize the SoftPWM library  */
 
    for ( int i = 0; i < (int)sizeof( LEDs ); ++i )
-      SoftPWMSet( LEDs[ i ], 99 );
+      SoftPWMSet( LEDs[ i ], BRIGHTNESS );
 
-   SoftPWMSetFadeTime( ALL, 50, 400 );    /*  Set fade-up time to 50 ms, fade-down time to 400 ms  */
-
-
+   // SoftPWMSetFadeTime( ALL, 50, 400 );    /*  Set fade-up time to 50 ms, fade-down time to 400 ms  */
 
 
    _PL(F( "-------------------------------------" ));
 
 
-   /*  calculate the settings for every output at startup  */
-   for(int i = 0; i < FastLED.count(); ++i )
+   /*  calculate the time setting for almost every output  */
+   for(int i = 0; i < (int)(sizeof( run_switch_set ) ); ++i )
    {
-      calculateNeoQueue( i );
+      if ( i < 7 ) { calculateNeoQueue( i ); } else { calculateLedQueue( i ); }
    }
 
 
@@ -377,8 +442,8 @@ void setup()
    // bool           isBlinking     = false ;   /*  output is blinker  */
    // unsigned long  blinkOnTime    =     0 ;   /*  millisec  ON time  */
    // unsigned long  blinkOffTime   =     0 ;   /*  millisec OFF time  */
-   // unsigned long  startMillies   =     0 ;   /*  cycle starttime    */
-   // unsigned long  currentPeriod  =     0 ;   /*  run time of cycle  */
+   // unsigned long  blinkMillies   =     0 ;   /*  cycle starttime    */
+   // unsigned long  blinkPeriod  =     0 ;   /*  run time of cycle  */
    // bool           nowOn          =  true ;   /*  led is  ON or OFF  */
 
 
@@ -393,6 +458,19 @@ void setup()
 
    NEO_queue[ 6 ].blinkOffTime = 150;
    NEO_queue[ 6 ].blinkOnTime  =  50;
+
+
+   NEO_queue[ 7 ].isBlinking = true;
+   NEO_queue[ 7 ].nowOn      = true;
+
+   NEO_queue[ 7 ].blinkOffTime = 1500;
+   NEO_queue[ 7 ].blinkOnTime  =  500;
+
+   NEO_queue[ 9 ].isBlinking = true;
+   NEO_queue[ 9 ].nowOn      = true;
+
+   NEO_queue[ 9 ].blinkOffTime = 150;
+   NEO_queue[ 9 ].blinkOnTime  =  50;
 
 
 
@@ -422,21 +500,25 @@ void loop()
 
    if ( run_switch_set[ indexOne ] && NEO_queue[ indexOne ].isBlinking )   /*  check if valid to run  */
    {
-      if ( currentMillis - NEO_queue[ indexOne ].startMillies >= NEO_queue[ indexOne ].currentPeriod )
+      if ( currentMillis - NEO_queue[ indexOne ].blinkMillies >= NEO_queue[ indexOne ].blinkPeriod )
       {
-         NEO_queue[ indexOne ].startMillies = currentMillis;
+         NEO_queue[ indexOne ].blinkMillies = currentMillis;
 
-         NEO_queue[ indexOne ].nowOn = !NEO_queue[ indexOne ].nowOn;
+         NEO_queue[ indexOne ].nowOn = !NEO_queue[ indexOne ].nowOn; /*  reverse the setting  */
 
-         calculateNeoBlink( indexOne );
+
+
+         if ( indexOne < 7 ) { calculateNeoBlink( indexOne ); } else { calculateLedBlink( indexOne ); }
+
+
 
          if ( NEO_queue[ indexOne ].nowOn )
          {
-            NEO_queue[ indexOne ].currentPeriod = NEO_queue[ indexOne ].blinkOnTime;
+            NEO_queue[ indexOne ].blinkPeriod = NEO_queue[ indexOne ].blinkOnTime;
          }
          else
          {
-            NEO_queue[ indexOne ].currentPeriod = NEO_queue[ indexOne ].blinkOffTime;
+            NEO_queue[ indexOne ].blinkPeriod = NEO_queue[ indexOne ].blinkOffTime;
          }
       }
    }
@@ -474,6 +556,70 @@ void softwareReset( uint8_t preScaler )
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
+void calculateLedQueue( int ledNumber )
+{
+   if ( run_switch_set[ 0 ] && NEO_queue[ ledNumber ].isEnabled )
+   {
+      int getCVNumber = ( ( ledNumber + 4 ) * 10 ) ;  /*  calculate the correct CVaddress  */
+
+   // {  45,  10},   /*  fade up time  multiplier  */
+   // {  46,  10},   /*  fade down     multiplier  */
+   // {  47,  10},   /*  blinking  ON  multiplier  */
+   // {  48,  10},   /*  blinking OFF  multiplier  */
+
+   // uint8_t        outputState    =     0 ;   /*  0, 1 or ?? status  */
+   // uint8_t        colorRed       =   255 ;   /*  value Red   color  */
+   // uint8_t        colorGreen     =   255 ;   /*  value Green color  */
+   // uint8_t        colorBlue      =   155 ;   /*  value Blue  color  */
+   // uint8_t        brightNess     =   127 ;   /*  brightness factor  */
+   // bool           isEnabled      =  true ;   /*  output is in use   */
+   // bool           isBlinking     = false ;   /*  output is blinker  */
+   // unsigned long  blinkOnTime    =     0 ;   /*  millisec  ON time  */
+   // unsigned long  blinkOffTime   =     0 ;   /*  millisec OFF time  */
+   // unsigned long  blinkMillies   =     0 ;   /*  blink cycle start  */
+   // unsigned long  blinkPeriod    =     0 ;   /*  run time of cycle  */
+   // bool           isFading       = false ;   /*  output is a fader  */
+   // unsigned long  fadingOnTime   =     0 ;   /*  millisec fade  ON  */
+   // unsigned long  fadingOffTime  =     0 ;   /*  millisec fade OFF  */
+   // unsigned long  fadingMillies  =     0 ;   /*  fade cycle  start  */
+   // unsigned long  fadingPeriod   =     0 ;   /*  run time of cycle  */
+   // bool           nowOn          =  true ;   /*  led is  ON or OFF  */
+
+
+
+
+/*  TODO: check if we REALLY need the colorRed, colorGreen and colorBlue in the NEO_queue  */
+
+      // NEO_queue[ ledNumber ].colorRed   = constrain( Dcc.getCV( getCVNumber + 1 ), 0, 255 );
+      // NEO_queue[ ledNumber ].colorGreen = constrain( Dcc.getCV( getCVNumber + 2 ), 0, 255 );
+      // NEO_queue[ ledNumber ].colorBlue  = constrain( Dcc.getCV( getCVNumber + 3 ), 0, 255 );
+      // NEO_queue[ ledNumber ].brightNess = constrain( Dcc.getCV( getCVNumber + 4 ), 0, 255 );
+
+      // NEOs[ ledNumber ] = CRGB( NEO_queue[ ledNumber ].colorRed, NEO_queue[ ledNumber ].colorGreen, NEO_queue[ ledNumber ].colorBlue );
+
+      // NEOs[ ledNumber ].nscale8_video( NEO_queue[ ledNumber ].brightNess );
+      // nscale8x3_video( NEOs[ ledNumber ].r, NEOs[ ledNumber ].g, NEOs[ ledNumber ].b, NEO_queue[ ledNumber ].brightNess );
+      // cleanup_R1();
+
+
+      _PP( " cv: " );
+      _2P( getCVNumber + 0 , DEC );
+      _PP( " value: " );
+      _2L( Dcc.getCV( getCVNumber + 0 ), DEC );
+
+      _PL(F( "-------------------------------------" ));
+   }
+   else
+   {
+      // NEOs[ ledNumber ] = CRGB::Black;
+   }
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 void calculateNeoQueue( int ledNumber )
 {
    if ( run_switch_set[ 0 ] && NEO_queue[ ledNumber ].isEnabled )
@@ -494,27 +640,35 @@ void calculateNeoQueue( int ledNumber )
       // nscale8x3_video( NEOs[ ledNumber ].r, NEOs[ ledNumber ].g, NEOs[ ledNumber ].b, NEO_queue[ ledNumber ].brightNess );
       // cleanup_R1();
 
+   // {  45,  10},   /*  fade up time  multiplier  */
+   // {  46,  10},   /*  fade down     multiplier  */
+   // {  47,  10},   /*  blinking  ON  multiplier  */
+   // {  48,  10},   /*  blinking OFF  multiplier  */
+
+   // uint8_t        outputState    =     0 ;   /*  0, 1 or ?? status  */
+   // uint8_t        colorRed       =   255 ;   /*  value Red   color  */
+   // uint8_t        colorGreen     =   255 ;   /*  value Green color  */
+   // uint8_t        colorBlue      =   155 ;   /*  value Blue  color  */
+   // uint8_t        brightNess     =   127 ;   /*  brightness factor  */
+   // bool           isEnabled      =  true ;   /*  output is in use   */
+   // bool           isBlinking     = false ;   /*  output is blinker  */
+   // unsigned long  blinkOnTime    =     0 ;   /*  millisec  ON time  */
+   // unsigned long  blinkOffTime   =     0 ;   /*  millisec OFF time  */
+   // unsigned long  blinkMillies   =     0 ;   /*  blink cycle start  */
+   // unsigned long  blinkPeriod    =     0 ;   /*  run time of cycle  */
+   // bool           isFading       = false ;   /*  output is a fader  */
+   // unsigned long  fadingOnTime   =     0 ;   /*  millisec fade  ON  */
+   // unsigned long  fadingOffTime  =     0 ;   /*  millisec fade OFF  */
+   // unsigned long  fadingMillies  =     0 ;   /*  fade cycle  start  */
+   // unsigned long  fadingPeriod   =     0 ;   /*  run time of cycle  */
+   // bool           nowOn          =  true ;   /*  led is  ON or OFF  */
+
+
 
       _PP( " cv: " );
       _2P( getCVNumber + 0 , DEC );
       _PP( " value: " );
       _2L( Dcc.getCV( getCVNumber + 0 ), DEC );
-      _PP( " cv: " );
-      _2P( getCVNumber + 1 , DEC );
-      _PP( " value: " );
-      _2L( Dcc.getCV( getCVNumber + 1 ), DEC );
-      _PP( " cv: " );
-      _2P( getCVNumber + 2 , DEC );
-      _PP( " value: " );
-      _2L( Dcc.getCV( getCVNumber + 2 ), DEC );
-      _PP( " cv: " );
-      _2P( getCVNumber + 3 , DEC );
-      _PP( " value: " );
-      _2L( Dcc.getCV( getCVNumber + 3 ), DEC );
-      _PP( " cv: " );
-      _2P( getCVNumber + 4 , DEC );
-      _PP( " value: " );
-      _2L( Dcc.getCV( getCVNumber + 4 ), DEC );
 
       _PL(F( "-------------------------------------" ));
    }
@@ -530,20 +684,29 @@ void calculateNeoQueue( int ledNumber )
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
+void calculateLedBlink( int ledNumber )
+{
+   if ( run_switch_set[ 0 ] && NEO_queue[ ledNumber ].isEnabled && NEO_queue[ ledNumber ].nowOn )
+   {
+
+      SoftPWMSet( LEDs[ ledNumber - ( NUM_STRIPS * NUM_NEOS ) - 1 ] , BRIGHTNESS );
+
+   }
+   else
+   {
+      SoftPWMSet( LEDs[ ledNumber - ( NUM_STRIPS * NUM_NEOS ) - 1 ] ,          0 );
+   }
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 void calculateNeoBlink( int ledNumber )
 {
    if ( run_switch_set[ 0 ] && NEO_queue[ ledNumber ].isEnabled && NEO_queue[ ledNumber ].nowOn )
    {
-//       int getCVNumber = ( ( ledNumber + 4 ) * 10 ) ;  /*  calculate the correct CVaddress  */
-
-
-// /*  TODO: check if we REALLY need the colorRed, colorGreen and colorBlue in the NEO_queue  */
-
-//       NEO_queue[ ledNumber ].colorRed   = constrain( Dcc.getCV( getCVNumber + 1 ), 0, 255 );
-//       NEO_queue[ ledNumber ].colorGreen = constrain( Dcc.getCV( getCVNumber + 2 ), 0, 255 );
-//       NEO_queue[ ledNumber ].colorBlue  = constrain( Dcc.getCV( getCVNumber + 3 ), 0, 255 );
-//       NEO_queue[ ledNumber ].brightNess = constrain( Dcc.getCV( getCVNumber + 4 ), 0, 255 );
-
       NEOs[ ledNumber ] = CRGB( NEO_queue[ ledNumber ].colorRed, NEO_queue[ ledNumber ].colorGreen, NEO_queue[ ledNumber ].colorBlue );
 
       NEOs[ ledNumber ].nscale8_video( NEO_queue[ ledNumber ].brightNess );
@@ -704,41 +867,39 @@ void parseCom( char *com )
 
          if( sscanf( com + 2, "%d", &fv ) != 1 ) { return; }  /*  get value and check for valid number  */
 
-         switch ( fv )  /*  F0 to F6  */
+         switch ( fv )
          {
 
-            case  0:
+            case  0:  /*  F0 to F10  */
             case  1:
             case  2:
             case  3:
             case  4:
             case  5:
             case  6:
+            case  7:
+            case  8:
+            case  9:
+            case 10:
             {
                run_switch_set[ fv ] = ( !run_switch_set[ fv ] );
 
                NEO_queue[ fv ].isEnabled = ( run_switch_set[ fv ] );
 
-               /*  calculate the time setting for almost every output  */
-               for(int i = 0; i < FastLED.count(); ++i )
-               {
-                  calculateNeoQueue( i );
-               }
-
                break;
             }
 
-            case  7:  /*  F7 to F12  */
-            case  8:
-            case  9:
-            case 10:
-            case 11:
+            case 11:  /*  F11 to F12  */
             case 12:
             default:
                break;
          }
 
-         // cvCheck = Dcc.getCV( 40 + ( fv * 10 ) );
+         /*  calculate the time setting for almost every output  */
+         for(int i = 0; i < (int)(sizeof( run_switch_set ) ); ++i )
+         {
+            if ( i < 7 ) { calculateNeoQueue( i ); } else { calculateLedQueue( i ); }
+         }
 
          _PL(F( "wait for the cycle to end..." ) );
          _PP(F( "<f F"                         ) );
@@ -797,12 +958,10 @@ void parseCom( char *com )
          uint8_t cvCheck = Dcc.setCV( cv, bValue ); /*  write action  */
 
          /*  calculate the time setting for almost every output  */
-         for(int i = 0; i < FastLED.count(); ++i )
+         for(int i = 0; i < (int)(sizeof( run_switch_set ) ); ++i )
          {
-            calculateNeoQueue( i );
+            if ( i < 7 ) { calculateNeoQueue( i ); } else { calculateLedQueue( i ); }
          }
-
-/*  TODO: here we still need the calculation for the LEDs  */
 
          _PP( "<w "        );
          _2P( cv + 0 , DEC );
@@ -926,9 +1085,9 @@ void    notifyCVChange( uint16_t CV, uint8_t Value )
    }
 
    /*  calculate the time setting for almost every output  */
-   for(int i = 0; i < FastLED.count(); ++i )
+   for(int i = 0; i < (int)(sizeof( run_switch_set ) ); ++i )
    {
-      calculateNeoQueue( i );
+      if ( i < 7 ) { calculateNeoQueue( i ); } else { calculateLedQueue( i ); }
    }
 
 }       //   end notifyCVChange()
